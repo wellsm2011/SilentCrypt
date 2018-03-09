@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<eclipse-userlibraries version="2">
+    <library name="BouncyCastle" systemlibrary="false">
+        <archive javadoc="jar:file:/C:/Users/Michael/Documents/GitHub/SilentCrypt/lib/bcprov-jdk15on-159-javadoc.zip!/" path="C:/Users/Michael/Documents/GitHub/SilentCrypt/lib/bcprov-jdk15on-159.jar" source="C:/Users/Michael/Documents/GitHub/SilentCrypt/lib/bcprov-jdk15on-159-src.zip"/>
+    </library>
+    <library name="GSON" systemlibrary="false">
+        <archive javadoc="jar:file:/C:/Users/Michael/Documents/GitHub/SilentCrypt/lib/gson-2.6.2-javadoc.jar!/" path="C:/Users/Michael/Documents/GitHub/SilentCrypt/lib/gson-2.6.2.jar" source="C:/Users/Michael/Documents/GitHub/SilentCrypt/lib/gson-2.6.2-sources.jar"/>
+    </library>
+</eclipse-userlibraries>
