@@ -1,30 +1,27 @@
 package silentcrypt.core.util;
 
-import java.util.Base64;
+import java.util.Arrays;
 
-import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.engines.AESEngine;
-import org.bouncycastle.crypto.paddings.BlockCipherPadding;
+import org.bouncycastle.crypto.modes.CBCBlockCipher;
 import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 
 public class AesUtil
 {
 	private static final AesUtil cipher = new AesUtil();
-	private final BlockCipher AESCipher = new AESEngine();
 
-	private PaddedBufferedBlockCipher	pbbc;
-	private KeyParameter				key;
-
-	public void setPadding(BlockCipherPadding bcp)
-	{
-		this.pbbc = new PaddedBufferedBlockCipher(AESCipher, bcp);
-	}
+	private final PaddedBufferedBlockCipher	aesCipher	= new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+	private KeyParameter					key			= null;
 
 	public void setKey(byte[] key)
 	{
+		// Ensure 256 bit key.
+		if (key.length != 32)
+			key = Arrays.copyOf(key, 32);
+
 		this.key = new KeyParameter(key);
 	}
 
@@ -40,41 +37,25 @@ public class AesUtil
 
 	private byte[] processing(byte[] input, boolean encrypt) throws DataLengthException, InvalidCipherTextException
 	{
+		this.aesCipher.init(encrypt, this.key);
 
-		pbbc.init(encrypt, key);
+		byte[] output = new byte[this.aesCipher.getOutputSize(input.length)];
+		int bytesWrittenOut = this.aesCipher.processBytes(input, 0, input.length, output, 0);
 
-		byte[] output = new byte[pbbc.getOutputSize(input.length)];
-		int bytesWrittenOut = pbbc.processBytes(input, 0, input.length, output, 0);
-
-		pbbc.doFinal(output, bytesWrittenOut);
+		this.aesCipher.doFinal(output, bytesWrittenOut);
 
 		return output;
-
 	}
 
-	public static byte[] encrypt(byte[] key, byte[] input) throws InvalidCipherTextException {
-		cipher.setKey(key);
-		return cipher.encrypt(input);
-	}
-	
-	public static byte[] decrypt(byte[] key, byte[] input) throws InvalidCipherTextException {
-		cipher.setKey(key);
-		return cipher.decrypt(input);
-	}
-	
-	public static String encrypt(byte[] key, String input) throws InvalidCipherTextException {
-		return toBase64(encrypt(key, input.getBytes()));
-	}
-	
-	public static String decrypt(byte[] key, String input) throws InvalidCipherTextException {
-		return new String(decrypt(key, fromBase64(input)));
+	public static BinaryData encrypt(BinaryData key, BinaryData input) throws InvalidCipherTextException
+	{
+		cipher.setKey(key.getBytes());
+		return BinaryData.fromBytes(cipher.encrypt(input.getBytes()));
 	}
 
-	private static String toBase64(byte[] input) {
-		return new String(Base64.getEncoder().encode(input));
-	}
-	
-	private static byte[] fromBase64(String input) {
-		return Base64.getDecoder().decode(input);
+	public static BinaryData decrypt(BinaryData key, BinaryData input) throws InvalidCipherTextException
+	{
+		cipher.setKey(key.getBytes());
+		return BinaryData.fromBytes(cipher.decrypt(input.getBytes()));
 	}
 }

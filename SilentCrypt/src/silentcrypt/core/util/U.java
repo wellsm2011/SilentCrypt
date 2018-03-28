@@ -3,6 +3,7 @@ package silentcrypt.core.util;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -15,6 +16,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
@@ -118,6 +120,28 @@ public class U
 		if (in instanceof Object[])
 			return Arrays.toString((Object[]) in);
 		return in.toString();
+	}
+
+	public static String toBase64(byte[] input)
+	{
+		return new String(Base64.getEncoder().encode(input));
+	}
+
+	public static byte[] fromBase64(String input)
+	{
+		return Base64.getDecoder().decode(input);
+	}
+
+	public static byte[] toBytes(String input)
+	{
+		try
+		{
+			return input.getBytes("UTF-8");
+		} catch (UnsupportedEncodingException e)
+		{
+			// We have big problems if we get here...
+			throw new UnsupportedOperationException(e);
+		}
 	}
 
 	@SafeVarargs
@@ -292,6 +316,21 @@ public class U
 		Stream<T> res = Stream.empty();
 		for (Stream<? extends T> s : (Iterable<Stream<? extends T>>) streams::iterator)
 			res = Stream.concat(res, s);
+		return res;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T> T quietCast(Object o)
+	{
+		return (T) o;
+	}
+
+	public static ByteBuffer toBuff(String string)
+	{
+		byte[] data = string.getBytes();
+		ByteBuffer res = ByteBuffer.allocateDirect(data.length);
+		res.put(data);
+		res.rewind();
 		return res;
 	}
 }
