@@ -7,16 +7,19 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 import silentcrypt.comm.net.communique.Communique;
-import silentcrypt.comm.net.incoming.ConnectionMultiplexer;
 import silentcrypt.comm.net.incoming.CommuniqueListener;
-import silentcrypt.comm.net.incoming.Filter;
+import silentcrypt.comm.net.incoming.ConnectionMultiplexer;
 import silentcrypt.util.U;
 
-public class ServerConn
+/**
+ * Provides ease-of-use methods for sending and receiving Communiques over a TCP connection.
+ *
+ * @author Andrew
+ * @author Michael
+ */
+public class ServerConn implements Listenable<ServerConn>
 {
 	public static ServerConn find()
 	{
@@ -33,6 +36,13 @@ public class ServerConn
 		}
 	}
 
+	/**
+	 * Creates a new server connection from the given InetAddress and Port.
+	 *
+	 * @param addr
+	 * @param port
+	 * @return
+	 */
 	public static ServerConn get(InetAddress addr, int port)
 	{
 		return new ServerConn(addr, port);
@@ -49,9 +59,9 @@ public class ServerConn
 	{
 		this.serverAddr = addr;
 		this.serverPort = port;
-		this.openConn();
-		this.startWatchDog();
-		this.startSender();
+		openConn();
+		startWatchDog();
+		startSender();
 	}
 
 	private Communique buildRegistrationPacket(String serviceID)
@@ -70,9 +80,10 @@ public class ServerConn
 		return comm;
 	}
 
-	public ServerConn listen(Filter filter, BiConsumer<Communique, Consumer<Communique>> handler)
+	@Override
+	public ServerConn listen(CommuniqueListener listener)
 	{
-		this.handlers.add(new CommuniqueListener(filter, handler));
+		this.handlers.add(listener);
 		return this;
 	}
 
@@ -90,12 +101,24 @@ public class ServerConn
 		}
 	}
 
+	/**
+	 * Registers a new service for use over this connection.
+	 *
+	 * @param serviceID
+	 * @return this object.
+	 */
 	public ServerConn register(String serviceID)
 	{
-		this.send(this.buildRegistrationPacket(serviceID));
+		send(buildRegistrationPacket(serviceID));
 		return this;
 	}
 
+	/**
+	 * Sends the provided message to the server on the other end of this connection.
+	 *
+	 * @param comm
+	 * @return this object.
+	 */
 	public ServerConn send(Communique comm)
 	{
 		this.sendQueue.add(comm);
@@ -119,7 +142,7 @@ public class ServerConn
 							U.e("Unable to send communique to server.", e);
 							this.sock = null;
 						}
-		}, "Communique Sender #" + this.hashCode());
+		}, "Communique Sender #" + hashCode());
 		sender.setDaemon(true);
 		sender.start();
 	}
@@ -137,14 +160,14 @@ public class ServerConn
 				} catch (NullPointerException e)
 				{
 					U.sleep(AerisStd.RETRY_PERIOD);
-					this.openConn();
+					openConn();
 				} catch (Throwable t)
 				{
 					U.e("Unable to connect to server, retrying...", t);
 					U.sleep(AerisStd.RETRY_PERIOD);
-					this.openConn();
+					openConn();
 				}
-		}, "Server Connection Watchdog #" + this.hashCode());
+		}, "Server Connection Watchdog #" + hashCode());
 		watcher.setDaemon(true);
 		watcher.setPriority(Thread.MIN_PRIORITY);
 		watcher.start();

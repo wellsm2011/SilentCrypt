@@ -8,6 +8,7 @@ import org.bouncycastle.crypto.params.RSAKeyParameters;
 import silentcrypt.util.AesUtil;
 import silentcrypt.util.BinaryData;
 import silentcrypt.util.RsaUtil;
+import silentcrypt.util.U;
 
 /**
  * Represents an individual field in a Communique.
@@ -63,7 +64,7 @@ public class CommuniqueField
 	}
 
 	/**
-	 * @return This field's data as a raw byte aray. Note that if this field is currently encrypted, this function will
+	 * @return This field's data as a raw byte array. Note that if this field is currently encrypted, this function will
 	 *         return encrypted data.
 	 */
 	public byte[] dataArray()
@@ -73,6 +74,11 @@ public class CommuniqueField
 		this.data.get(ret);
 		this.data.reset();
 		return ret;
+	}
+
+	public boolean dataEquals(String data)
+	{
+		return dataEquals(U.toBytes(data));
 	}
 
 	public boolean dataEquals(byte[] data)
@@ -155,6 +161,10 @@ public class CommuniqueField
 		this.size = this.data.remaining();
 	}
 
+	/**
+	 * @param oth
+	 * @return true iff the other CommuniqueField contains the same data with the same encryption.
+	 */
 	public boolean equals(CommuniqueField oth)
 	{
 		if (oth == null)
@@ -174,7 +184,7 @@ public class CommuniqueField
 	public boolean equals(Object o)
 	{
 		if (o instanceof CommuniqueField)
-			return this.equals(o);
+			return this.equals((CommuniqueField) o);
 		return false;
 	}
 

@@ -4,6 +4,9 @@ import java.util.function.Predicate;
 
 import silentcrypt.comm.net.communique.Communique;
 
+/**
+ * @author Andrew
+ */
 public interface Filter extends Predicate<Communique>
 {
 	public static Filter all()

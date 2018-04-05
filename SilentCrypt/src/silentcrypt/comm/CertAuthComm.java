@@ -17,21 +17,24 @@ import silentcrypt.comm.net.communique.Communique;
 import silentcrypt.comm.net.incoming.Filter;
 import silentcrypt.comm.net.server.Host;
 import silentcrypt.comm.net.server.ServerConn;
-import silentcrypt.util.BinaryData;
 import silentcrypt.util.RsaKeyPair;
 import silentcrypt.util.RsaUtil;
 import silentcrypt.util.U;
 
+/**
+ * @author Michael
+ */
 public class CertAuthComm
 {
 	public static class CertAuthHost
 	{
 		RsaKeyPair				key;
-		Predicate<Communique>	isDistReq	= c -> c.fieldCount() > 0 && c.getFields().get(0).dataEquals(CertAuthComm.DIST_COMM_VERSION);
-		Predicate<Communique>	isCertReq	= c -> c.fieldCount() > 1 && c.getFields().get(0).dataEquals(CertAuthComm.CERT_COMM_VERSION);
-		Predicate<Communique>	pubFilter	= c -> true;
+		Predicate<Communique>	isDistReq	= c -> c.fieldCount() > 0 && c.getFields().get(0).dataEquals(U.toBytes(CertAuthComm.DIST_COMM_VERSION));
+		Predicate<Communique>	isCertReq	= c -> c.fieldCount() > 1 && c.getFields().get(0).dataEquals(U.toBytes(CertAuthComm.CERT_COMM_VERSION));
+		Predicate<Communique>	distFilter	= c -> true;
 		Predicate<Communique>	certFilter	= c -> true;
-		int						port		= 777;
+		boolean					started		= false;
+		int						port		= DEFAULT_PORT;
 
 		private CertAuthHost(RsaKeyPair key)
 		{
@@ -39,8 +42,8 @@ public class CertAuthComm
 		}
 
 		/**
-		 * Adds a new requirement on incoming certification Communiques. Communiques which do not pass the given filter
-		 * are responded to with a failure code.
+		 * Adds a new requirement on incoming certification requests. Communiques which do not pass the given filter are
+		 * responded to with a failure code.
 		 *
 		 * @param filter
 		 * @return
@@ -51,29 +54,50 @@ public class CertAuthComm
 			return this;
 		}
 
+		/**
+		 * Adds a new requirement on incoming CA public key distribution requests. Communiques which do not pass the
+		 * given filter are responded to with a failure code.
+		 *
+		 * @param filter
+		 * @return
+		 */
 		public CertAuthHost requireDistVerification(Predicate<Communique> filter)
 		{
-			this.pubFilter = this.pubFilter.and(filter);
+			this.distFilter = this.distFilter.and(filter);
 			return this;
 		}
 
+		/**
+		 * Sets the port over which communication will carry out.
+		 *
+		 * @param port
+		 * @return
+		 */
 		public CertAuthHost setPort(int port)
 		{
+			if (this.started)
+				throw new IllegalStateException("Server already started!");
 			this.port = port;
 			return this;
 		}
 
 		public CertAuthHost start()
 		{
-			Communique publicReply = new Communique();
-			publicReply.add(RsaUtil.toBytes(this.key.getPublicRsa()));
-			U.p("Listening for connections.");
-			Host.start(this.port).listen(Filter.by(this.isDistReq.or(this.isCertReq)), (c, cons) -> {
-				Communique reply = publicReply;
+			Communique publicReply = new Communique().add(MESSAGE_ACCEPT).add(RsaUtil.toBytes(this.key.getPublicRsa()));
 
-				if (!c.getFields().isEmpty())
-					try
-					{
+			Communique messageReject = new Communique().add(MESSAGE_REJECT);
+
+			this.started = true;
+			// Reply to distribution requests with the public reply iff they pass the distFilter.
+			Host.start(this.port).listen(Filter.by(c -> this.isDistReq.test(c)), (c, cons) -> cons.accept(this.distFilter.test(c) ? publicReply : messageReject))
+					.listen(Filter.by(c -> this.isCertReq.test(c)), (c, cons) -> {
+						if (!this.certFilter.test(c))
+						{
+							cons.accept(messageReject);
+							return;
+						}
+
+						AtomicBoolean hasError = new AtomicBoolean(false);
 						RSAKeyParameters orig = RsaUtil.fromBytes(c.getFields().get(0).dataArray());
 						byte[] origMod = orig.getModulus().toByteArray();
 						byte[] origExp = orig.getExponent().toByteArray();
@@ -81,23 +105,32 @@ public class CertAuthComm
 						ByteBuffer toEncrypt = ByteBuffer.allocate(origMod.length + origExp.length);
 						toEncrypt.put(origMod).put(origExp);
 
-						reply = new Communique();
-						reply.add(RsaUtil.encrypt(BinaryData.fromBytes(toEncrypt.array()), this.key.getPrivateRsa()).getBytes());
-					} catch (InvalidCipherTextException e)
-					{
-						// TODO Handle unexpected RSA error.
-						U.e("CA is unable to authenticate RSA key.", e);
-					}
-				cons.accept(reply);
-			});
+						Communique reply = new Communique().add(MESSAGE_ACCEPT).add(toEncrypt.array(), cf -> {
+							try
+							{
+								cf.encrypt(this.key.getPrivateRsa());
+							} catch (InvalidCipherTextException | IllegalStateException e)
+							{
+								// Well. We got a really weird error... That sucks. ABORT!
+								hasError.set(true);
+								e.printStackTrace();
+							}
+						});
+
+						if (!hasError.get())
+							cons.accept(reply);
+					});
 			return this;
 		}
 	}
 
-	private static final byte[]	CERT_COMM_VERSION	= U.toBytes("SC-CERT-0001");
-	private static final byte[]	DIST_COMM_VERSION	= U.toBytes("SC-DIST-0001");
+	public static final int DEFAULT_PORT = 777;
 
-	private static final String MESSAGE_REJECT = "SC-CA-REJECT";
+	private static final String	CERT_COMM_VERSION	= "SC-CERT-0001";
+	private static final String	DIST_COMM_VERSION	= "SC-DIST-0001";
+
+	private static final String	MESSAGE_REJECT	= "SC-CA-REJECT";
+	private static final String	MESSAGE_ACCEPT	= "SC-CA-ACCEPT";
 
 	public static CertAuthComm client(InetAddress addr)
 	{
@@ -106,36 +139,12 @@ public class CertAuthComm
 
 	public static RSAKeyParameters getCaPublicKey(InetAddress addr, int port) throws TimeoutException
 	{
-		return CertAuthComm.getCaPublicKey(addr, port, 60 * 1000);
+		return CertAuthComm.client(addr).setPort(port).query();
 	}
 
 	public static RSAKeyParameters getCaPublicKey(InetAddress addr, int port, int timeoutMilis) throws TimeoutException
 	{
-		Thread me = Thread.currentThread();
-		AtomicBoolean isWaiting = new AtomicBoolean(true);
-
-		Communique message = new Communique();
-		AtomicReference<RSAKeyParameters> ref = new AtomicReference<>();
-
-		ServerConn.get(addr, port).listen(c -> c.getFields().size() == 1, (c, cons) -> {
-			ref.set(RsaUtil.fromBytes(c.getFields().get(0).dataArray()));
-			if (isWaiting.getAndSet(false))
-				me.interrupt();
-		}).send(message);
-
-		try
-		{
-			Thread.sleep(timeoutMilis);
-			isWaiting.set(false);
-		} catch (InterruptedException e)
-		{
-			// Do nothing.
-		}
-
-		if (Objects.isNull(ref.get()))
-			throw new TimeoutException("No response from " + addr);
-
-		return ref.get();
+		return CertAuthComm.client(addr).setPort(port).setTimeout(timeoutMilis).query();
 	}
 
 	public static CertAuthHost host(RsaKeyPair key)
@@ -143,7 +152,7 @@ public class CertAuthComm
 		return new CertAuthHost(key);
 	}
 
-	int port = 777;
+	int port = DEFAULT_PORT;
 
 	InetAddress host;
 
@@ -163,7 +172,7 @@ public class CertAuthComm
 		message.add(RsaUtil.toBytes(key));
 		AtomicReference<byte[]> ref = new AtomicReference<>();
 
-		this.send(message, c -> c.getFields().size() == 1, (c, cons) -> {
+		send(message, c -> c.getFields().size() == 1, (c, cons) -> {
 			ref.set(c.getFields().get(0).dataArray());
 			if (isWaiting.getAndSet(false))
 				me.interrupt();
@@ -196,14 +205,14 @@ public class CertAuthComm
 		Thread thread = new Thread(() -> {
 			try
 			{
-				listener.accept(this.certify(key));
+				listener.accept(certify(key));
 			} catch (Exception ex)
 			{
 				exceptionHandler.accept(ex);
 			}
 		});
 		thread.setDaemon(true);
-		thread.setName("Certification Watchdog #" + this.hashCode());
+		thread.setName("Certification Watchdog #" + hashCode());
 		thread.start();
 	}
 
@@ -212,10 +221,10 @@ public class CertAuthComm
 		Thread me = Thread.currentThread();
 		AtomicBoolean isWaiting = new AtomicBoolean(true);
 
-		Communique message = new Communique();
+		Communique message = new Communique().add(DIST_COMM_VERSION);
 		AtomicReference<RSAKeyParameters> ref = new AtomicReference<>();
 
-		this.send(message, c -> c.getFields().size() == 1, (c, cons) -> {
+		send(message, c -> c.getFields().size() == 1, (c, cons) -> {
 			ref.set(RsaUtil.fromBytes(c.getFields().get(0).dataArray()));
 			if (isWaiting.getAndSet(false))
 				me.interrupt();
@@ -248,14 +257,14 @@ public class CertAuthComm
 		Thread thread = new Thread(() -> {
 			try
 			{
-				listener.accept(this.query());
+				listener.accept(query());
 			} catch (Exception ex)
 			{
 				exceptionHandler.accept(ex);
 			}
 		});
 		thread.setDaemon(true);
-		thread.setName("Certification Watchdog #" + this.hashCode());
+		thread.setName("Certification Watchdog #" + hashCode());
 		thread.start();
 	}
 

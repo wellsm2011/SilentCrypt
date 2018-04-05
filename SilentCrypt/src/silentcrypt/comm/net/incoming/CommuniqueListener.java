@@ -6,7 +6,14 @@ import java.util.function.Predicate;
 
 import silentcrypt.comm.net.communique.Communique;
 
-public class CommuniqueListener implements BiConsumer<Communique, Consumer<Communique>>, Predicate<Communique>
+/**
+ * Represents the pairing of a Filter which tests Communiques to decide whether to receive them and a BiConsumer which
+ * processes accepted Communiques.
+ *
+ * @author Michael
+ * @author Andrew
+ */
+public class CommuniqueListener implements Filter, BiConsumer<Communique, Consumer<Communique>>
 {
 	private Predicate<Communique>							filter;
 	private BiConsumer<Communique, Consumer<Communique>>	handler;

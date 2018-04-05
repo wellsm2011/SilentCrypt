@@ -3,16 +3,20 @@ package silentcrypt.comm.net.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.net.incoming.CommuniqueListener;
 import silentcrypt.comm.net.incoming.ConnectionMultiplexer;
-import silentcrypt.comm.net.incoming.Filter;
 import silentcrypt.util.U;
 
-public class Host
+/**
+ * Provides ease-of-use methods for accepting TCP connections which send and receive Communiques.
+ *
+ * @author Michael
+ * @author Andrew
+ */
+public class Host implements Listenable<Host>
 {
 	/**
 	 * Starts a new server host. Uses standard port.
@@ -24,6 +28,12 @@ public class Host
 		return Host.start(AerisStd.PORT);
 	}
 
+	/**
+	 * Start a new server host. Uses the given port.
+	 *
+	 * @param port
+	 * @return a new Host
+	 */
 	public static Host start(int port)
 	{
 		return new Host(() -> {
@@ -47,14 +57,14 @@ public class Host
 	{
 		this.multiplexer = new ConnectionMultiplexer();
 		this.src = sockSrc;
-		this.init();
+		init();
 		Thread listener = new Thread(() -> {
 			for (;;)
 				try
 				{
 					U.p("Waiting for connection...");
 					Socket t = this.sock.accept();
-					new Thread(() -> this.handle(t), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
+					new Thread(() -> handle(t), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
 				} catch (IOException e)
 				{
 					U.e("Error accepting connection. " + e.getMessage());
@@ -102,9 +112,10 @@ public class Host
 		}
 	}
 
-	public Host listen(Filter filter, BiConsumer<Communique, Consumer<Communique>> handler)
+	@Override
+	public Host listen(CommuniqueListener listener)
 	{
-		this.multiplexer.listen(filter, handler);
+		this.multiplexer.listen(listener);
 		return this;
 	}
 }

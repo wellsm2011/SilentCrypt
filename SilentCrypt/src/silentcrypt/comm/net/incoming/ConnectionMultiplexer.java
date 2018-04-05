@@ -5,12 +5,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.net.server.Listenable;
 
 /**
  * A class for managing a set of listeners which receive new Communiques and distributing messages to them.
@@ -18,7 +17,7 @@ import silentcrypt.comm.net.communique.Communique;
  * @author Andrew
  * @author Michael
  */
-public class ConnectionMultiplexer
+public class ConnectionMultiplexer implements Listenable<ConnectionMultiplexer>
 {
 	private List<CommuniqueListener> handlers;
 
@@ -69,11 +68,6 @@ public class ConnectionMultiplexer
 		this.handlers = handlerSrc.get();
 	}
 
-	private void _listen(Predicate<Communique> filter, BiConsumer<Communique, Consumer<Communique>> handler)
-	{
-		this.handlers.add(new CommuniqueListener(filter, handler));
-	}
-
 	/**
 	 * Distributes the given Communique and reply in parallel among the registered handlers.
 	 *
@@ -90,36 +84,10 @@ public class ConnectionMultiplexer
 		return this;
 	}
 
-	/**
-	 * Register a new handler for incoming messages.
-	 *
-	 * @param filter
-	 * @param handler
-	 */
-	public void listen(Filter filter, BiConsumer<Communique, Consumer<Communique>> handler)
-	{
-		_listen(filter, handler);
-	}
-
-	/**
-	 * Register a new handler for incoming messages.
-	 *
-	 * @param filter
-	 * @param handler
-	 */
-	public void listen(Predicate<Communique> filter, BiConsumer<Communique, Consumer<Communique>> handler)
-	{
-		_listen(filter, handler);
-	}
-
-	/**
-	 * Register a new handler for incoming messages.
-	 *
-	 * @param filter
-	 * @param handler
-	 */
-	public void listen(CommuniqueListener listener)
+	@Override
+	public ConnectionMultiplexer listen(CommuniqueListener listener)
 	{
 		this.handlers.add(listener);
+		return this;
 	}
 }
