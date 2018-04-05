@@ -3,7 +3,6 @@ package silentcrypt.core.util;
 import java.util.Arrays;
 
 import org.bouncycastle.crypto.InvalidCipherTextException;
-import org.bouncycastle.crypto.params.RSAKeyParameters;
 
 public class UtilTestDriver
 {
@@ -23,22 +22,12 @@ public class UtilTestDriver
 
 		// AsymmetricCipherKeypair includes both private and public keys, but AsymmetricKeyPair includes only public
 		RsaKeyPair keyPair = RsaUtil.generateKeyPair();
-		U.p("RSA Key Pair: " + toString(keyPair));
+		U.p("RSA Key Pair: " + U.toString(keyPair));
 
-		BinaryData encryptedMessage = RsaUtil.encrypt(plainMessage, keyPair.getPublic());
+		BinaryData encryptedMessage = RsaUtil.encrypt(plainMessage, keyPair.getPublicRsa());
 		U.p("RSA Cipher Text: " + encryptedMessage.toBase64());
 
-		BinaryData decryptedMessage = RsaUtil.decrypt(encryptedMessage, keyPair.getPrivate());
+		BinaryData decryptedMessage = RsaUtil.decrypt(encryptedMessage, keyPair.getPrivateRsa());
 		U.p("Decrypted RSA Text: " + decryptedMessage);
-	}
-
-	private static String toString(RsaKeyPair key)
-	{
-		return "[publicKey=" + toString(key.getPublic()) + ", private=" + toString(key.getPrivate()) + "]";
-	}
-
-	private static String toString(RSAKeyParameters params)
-	{
-		return "[exp=" + params.getExponent() + ", mod=" + params.getModulus() + "]";
 	}
 }

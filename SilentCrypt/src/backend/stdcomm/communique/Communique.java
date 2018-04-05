@@ -82,7 +82,7 @@ public class Communique
 						continue;
 					}
 
-					List<CommuniqueField> fields = new ArrayList<>();
+					List<CommuniqueField> fields = new ArrayList<>(c.fieldCount);
 					for (int i = 0; i < c.fieldCount; i++)
 					{
 						short type = input.readShort();
@@ -156,7 +156,7 @@ public class Communique
 		return new Communique().add(s);
 	}
 
-	private byte[]	version;
+	private byte[]	version	= getCurrentVersion();
 	private int		flags;
 
 	private int fieldCount;

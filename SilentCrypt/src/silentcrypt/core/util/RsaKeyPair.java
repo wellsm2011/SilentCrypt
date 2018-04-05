@@ -6,29 +6,20 @@ import org.bouncycastle.crypto.params.RSAKeyParameters;
 /**
  * a holding class for public/private parameter pairs.
  */
-public class RsaKeyPair
+public class RsaKeyPair extends AsymmetricCipherKeyPair
 {
-	private RSAKeyParameters	publicParam;
-	private RSAKeyParameters	privateParam;
-
 	public RsaKeyPair(RSAKeyParameters publicParam, RSAKeyParameters privateParam)
 	{
-		this.publicParam = publicParam;
-		this.privateParam = privateParam;
+		super(publicParam, privateParam);
 	}
 
-	public RSAKeyParameters getPublic()
+	public RSAKeyParameters getPublicRsa()
 	{
-		return this.publicParam;
+		return U.quietCast(getPublic());
 	}
 
-	public RSAKeyParameters getPrivate()
+	public RSAKeyParameters getPrivateRsa()
 	{
-		return this.privateParam;
-	}
-
-	public AsymmetricCipherKeyPair toCipherKeyPair()
-	{
-		return new AsymmetricCipherKeyPair(this.publicParam, this.privateParam);
+		return U.quietCast(getPrivate());
 	}
 }

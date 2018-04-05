@@ -30,6 +30,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
+import org.bouncycastle.crypto.params.RSAKeyParameters;
+
 public class U
 {
 	private static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("LLL/dd/yyyy hh:mm:ss.SSS a").withZone(ZoneId.systemDefault()).withLocale(Locale.getDefault());
@@ -97,7 +99,7 @@ public class U
 		return false;
 	}
 
-	private static String expandIfArray(Object in)
+	public static String niceToString(Object in)
 	{
 		if (in == null)
 			return "null";
@@ -169,7 +171,7 @@ public class U
 
 	public static void p(Object in)
 	{
-		U.p(U.expandIfArray(in));
+		U.p(U.niceToString(in));
 	}
 
 	public static void p(String in)
@@ -179,7 +181,7 @@ public class U
 
 	public static void printWithTag(String tag, Object in)
 	{
-		U.printWithTag(tag, U.expandIfArray(in));
+		U.printWithTag(tag, U.niceToString(in));
 	}
 
 	public static void printWithTag(String tag, String message)
@@ -187,6 +189,7 @@ public class U
 		StringBuilder sb = new StringBuilder();
 		sb.append('[').append(U.formatter.format(Instant.now())).append(']');
 		sb.append('[').append(tag).append(']');
+		sb.append('[').append(Thread.currentThread().getName()).append(']');
 		sb.append(message);
 		System.out.println(sb.toString());
 	}
@@ -332,5 +335,15 @@ public class U
 		res.put(data);
 		res.rewind();
 		return res;
+	}
+
+	public static String toString(RsaKeyPair key)
+	{
+		return "[publicKey=" + toString(key.getPublicRsa()) + ", private=" + toString(key.getPrivateRsa()) + "]";
+	}
+
+	public static String toString(RSAKeyParameters params)
+	{
+		return "[exp=" + params.getExponent() + ", mod=" + params.getModulus() + "]";
 	}
 }

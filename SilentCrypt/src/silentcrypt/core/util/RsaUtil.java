@@ -1,9 +1,11 @@
 package silentcrypt.core.util;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.util.Random;
 
 import org.bouncycastle.crypto.AsymmetricBlockCipher;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
@@ -13,10 +15,24 @@ import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
 import org.bouncycastle.crypto.params.RSAKeyGenerationParameters;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.util.Arrays;
 
+/**
+ * Contains utility functions for working with RSA public key encryption.
+ *
+ * @author Michael
+ */
 public class RsaUtil
 {
+	// Magic number for encryption.
+	private static final byte[] RSA_VERSION = "SC-RSA-0001".getBytes();
+
+	/**
+	 * Generates a brand new RSA key pair.
+	 * <p>
+	 * <b>WARNING</b>: Computationally expensive operation.
+	 *
+	 * @return
+	 */
 	public static RsaKeyPair generateKeyPair()
 	{
 		RSAKeyPairGenerator generator = new RSAKeyPairGenerator();
@@ -34,56 +50,131 @@ public class RsaUtil
 		return new RsaKeyPair(U.quietCast(keyPair.getPublic()), U.quietCast(keyPair.getPrivate()));
 	}
 
-	public static BinaryData encrypt(BinaryData data, RSAKeyParameters key)
+	/**
+	 * Performs RSA encryption on the given data using the given key.
+	 *
+	 * @param data
+	 *            The data to encrypt.
+	 * @param key
+	 *            The key to encrypt with.
+	 * @return A binary blob containing the encrypted data.
+	 * @throws InvalidCipherTextException
+	 */
+	public static BinaryData encrypt(BinaryData data, RSAKeyParameters key) throws InvalidCipherTextException
 	{
-		Security.addProvider(new BouncyCastleProvider());
+		// End result will be [[key length][rsa-encrypted aes key][aes encrypted data]]
 
+		// Generate AES key at random.
+		byte[] aesKey = new byte[AesUtil.AES_KEY_SIZE];
+		new Random().nextBytes(aesKey);
+
+		Security.addProvider(new BouncyCastleProvider());
 		RSAEngine engine = new RSAEngine();
 		engine.init(true, key);
 
-		byte[] cipherBytes = engine.processBlock(data.getBytes(), 0, data.getBytes().length);
+		byte[] rsaCipher = engine.processBlock(aesKey, 0, aesKey.length);
+		ByteBuffer aesPlainText = ByteBuffer.allocate(data.size() + RSA_VERSION.length);
+		aesPlainText.put(RSA_VERSION);
+		aesPlainText.put(data.getBuffer());
+		BinaryData aesCipher = AesUtil.encrypt(BinaryData.fromBytes(aesKey), BinaryData.fromBytes(aesPlainText.array()));
 
-		return BinaryData.fromBytes(cipherBytes);
+		ByteBuffer message = ByteBuffer.allocate(rsaCipher.length + aesCipher.size() + Integer.BYTES);
+		message.putInt(rsaCipher.length);
+		message.put(rsaCipher);
+		message.put(aesCipher.getBuffer());
+
+		return BinaryData.fromBytes(message.array());
 	}
 
+	/**
+	 * Performs RSA decryption on the given data using the given key.
+	 *
+	 * @param data
+	 *            The data to decrypt.
+	 * @param key
+	 *            The key to decrypt with.
+	 * @return A binary blob containing the decrypted data.
+	 */
 	public static BinaryData decrypt(BinaryData encrypted, RSAKeyParameters key) throws InvalidCipherTextException
 	{
-		Security.addProvider(new BouncyCastleProvider());
+		ByteBuffer message = encrypted.getBuffer();
+		int rsaBlockSize = message.getInt();
+		byte[] rsaBlock = new byte[rsaBlockSize];
+		message.get(rsaBlock);
 
+		Security.addProvider(new BouncyCastleProvider());
 		AsymmetricBlockCipher engine = new RSAEngine();
 		engine.init(false, key);
+		byte[] aesKey = engine.processBlock(rsaBlock, 0, rsaBlock.length);
+		byte[] aesCipher = new byte[message.remaining()];
+		message.get(aesCipher);
 
-		byte[] encryptedBytes = encrypted.getBytes();
-		byte[] hexEncodedCipher = engine.processBlock(encrypted.getBytes(), 0, encryptedBytes.length);
+		ByteBuffer result = AesUtil.decrypt(BinaryData.fromBytes(aesKey), BinaryData.fromBytes(aesCipher)).getBuffer();
+		byte[] magicNumber = new byte[RSA_VERSION.length];
+		result.get(magicNumber);
+		for (int i = 0; i < magicNumber.length; ++i)
+		{
+			if (magicNumber[i] != RSA_VERSION[i])
+				throw new IllegalArgumentException("Encrypted RSA data was not encrypted with SilentCrypt.");
+		}
 
-		return BinaryData.fromBytes(hexEncodedCipher);
+		byte[] ret = new byte[result.remaining()];
+		result.get(ret);
+		return BinaryData.fromBytes(ret);
 	}
 
-	public static RSAKeyParameters fromBytes(byte[] key)
-	{
-		if (key[0] > key.length - 2)
-			throw new IllegalArgumentException("Invalid exponent length field.");
-
-		byte[] exp = Arrays.copyOfRange(key, 1, key[0] + 1);
-		byte[] mod = Arrays.copyOfRange(key, key[0] + 1, key.length);
-
-		return new RSAKeyParameters(false, new BigInteger(mod), new BigInteger(exp));
-	}
-
+	/**
+	 * Encodes a given key to a byte array. This operation can be reversed with {@link #fromBytes(byte[])}.
+	 *
+	 * @param key
+	 *            The RSA key to encode.
+	 * @return A byte array containing the components of the key.
+	 */
 	public static byte[] toBytes(RSAKeyParameters key)
 	{
-		byte[] mod = key.getModulus().toByteArray();
 		byte[] exp = key.getExponent().toByteArray();
+		byte[] mod = key.getModulus().toByteArray();
 
-		if (exp.length > Byte.MAX_VALUE)
-			throw new IllegalArgumentException("Exponent length cannot fit in one byte; length: " + exp.length);
+		// Format: [[exp length][mod length][exp][mod]]
 
-		byte[] keyBytes = new byte[mod.length + exp.length + 4];
-		keyBytes[0] = (byte) exp.length;
-		for (int i = 0; i < exp.length; ++i)
-			keyBytes[i + 1] = exp[i];
-		for (int i = 0; i < mod.length; ++i)
-			keyBytes[i + 1 + exp.length] = mod[i];
-		return keyBytes;
+		ByteBuffer res = ByteBuffer.allocate(Integer.BYTES * 2 + exp.length + mod.length);
+		res.putInt(exp.length);
+		res.putInt(mod.length);
+		res.put(exp);
+		res.put(mod);
+		return res.array();
+	}
+
+	/**
+	 * Encodes a key from a given byte array. This operation can be reversed with {@link #toBytes(RSAKeyParameters)}.
+	 *
+	 * @param key
+	 *            A byte array containing the components of the key.
+	 * @return The RSA key contained in the byte array.
+	 */
+	public static RSAKeyParameters fromBytes(byte[] key)
+	{
+		if (key.length < 4)
+			throw new IllegalArgumentException("Invalid encoded RSA data format: not enough data to extract key");
+
+		ByteBuffer wrapped = ByteBuffer.wrap(key);
+		int expLen = wrapped.getInt();
+		int modLen = wrapped.getInt();
+
+		if (expLen < 1)
+			throw new IllegalArgumentException("Invalid encoded RSA data format: exponent length is negative (" + expLen + ")");
+		if (modLen < 1)
+			throw new IllegalArgumentException("Invalid encoded RSA data format: modulus length is negative (" + modLen + ")");
+
+		long expectedCapacity = expLen + (long) modLen + Integer.BYTES * 2;
+		if (wrapped.capacity() != expectedCapacity)
+			throw new IllegalArgumentException("Invalid encoded RSA data format: bad data length (decoded: " + expectedCapacity + ", actual: " + wrapped.capacity() + ")");
+
+		byte[] exp = new byte[expLen];
+		byte[] mod = new byte[modLen];
+
+		wrapped.get(exp).get(mod);
+
+		return new RSAKeyParameters(false, new BigInteger(mod), new BigInteger(exp));
 	}
 }

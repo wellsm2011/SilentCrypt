@@ -52,6 +52,7 @@ public class Host
 			for (;;)
 				try
 				{
+					U.p("Waiting for connection...");
 					Socket t = this.sock.accept();
 					new Thread(() -> handle(t), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
 				} catch (IOException e)

@@ -39,6 +39,15 @@ public class CommuniqueField
 		return this.data;
 	}
 
+	public byte[] dataArray()
+	{
+		this.data.mark();
+		byte[] ret = new byte[this.data.remaining()];
+		this.data.get(ret);
+		this.data.reset();
+		return ret;
+	}
+
 	public Datatype getDatatype()
 	{
 		return this.datatype;

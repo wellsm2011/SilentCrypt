@@ -35,7 +35,7 @@ public class ServerConn
 
 	public static ServerConn get(InetAddress addr, int port)
 	{
-		return new ServerConn(addr, AerisStd.PORT);
+		return new ServerConn(addr, port);
 	}
 
 	private InetAddress							serverAddr;
@@ -86,7 +86,7 @@ public class ServerConn
 		} catch (IOException e)
 		{
 			this.sock = null;
-			U.e("Unable to establish connection with prime AERIS instance at host " + this.serverAddr + " " + e.getMessage());
+			U.e("Unable to establish connection with host " + this.serverAddr + ": " + e.getMessage());
 		}
 	}
 
