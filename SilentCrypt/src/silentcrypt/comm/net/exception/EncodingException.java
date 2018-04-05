@@ -1,5 +1,9 @@
-package backend.stdcomm.exception;
+package silentcrypt.comm.net.exception;
 
+/**
+ * @author Andrew
+ * @author Michael
+ */
 public class EncodingException extends RuntimeException
 {
 	private static final long serialVersionUID = 1L;

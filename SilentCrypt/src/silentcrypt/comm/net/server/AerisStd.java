@@ -1,4 +1,4 @@
-package backend.stdcomm.server;
+package silentcrypt.comm.net.server;
 
 enum AerisStd
 {

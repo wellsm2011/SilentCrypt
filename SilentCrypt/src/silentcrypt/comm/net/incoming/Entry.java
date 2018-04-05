@@ -1,10 +1,10 @@
-package backend.stdcomm.incoming;
+package silentcrypt.comm.net.incoming;
 
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import backend.stdcomm.communique.Communique;
+import silentcrypt.comm.net.communique.Communique;
 
 public class Entry
 {

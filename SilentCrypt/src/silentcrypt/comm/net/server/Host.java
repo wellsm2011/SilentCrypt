@@ -1,4 +1,4 @@
-package backend.stdcomm.server;
+package silentcrypt.comm.net.server;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -7,10 +7,10 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import backend.stdcomm.communique.Communique;
-import backend.stdcomm.incoming.ConnectionMultiplexer;
-import backend.stdcomm.incoming.Filter;
-import silentcrypt.core.util.U;
+import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.net.incoming.ConnectionMultiplexer;
+import silentcrypt.comm.net.incoming.Filter;
+import silentcrypt.util.U;
 
 public class Host
 {
@@ -21,7 +21,7 @@ public class Host
 	 */
 	public static Host start()
 	{
-		return start(AerisStd.PORT);
+		return Host.start(AerisStd.PORT);
 	}
 
 	public static Host start(int port)
@@ -47,14 +47,14 @@ public class Host
 	{
 		this.multiplexer = new ConnectionMultiplexer();
 		this.src = sockSrc;
-		init();
+		this.init();
 		Thread listener = new Thread(() -> {
 			for (;;)
 				try
 				{
 					U.p("Waiting for connection...");
 					Socket t = this.sock.accept();
-					new Thread(() -> handle(t), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
+					new Thread(() -> this.handle(t), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
 				} catch (IOException e)
 				{
 					U.e("Error accepting connection. " + e.getMessage());

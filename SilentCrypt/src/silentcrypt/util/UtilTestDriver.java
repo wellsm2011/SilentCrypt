@@ -1,4 +1,4 @@
-package silentcrypt.core.util;
+package silentcrypt.util;
 
 import java.util.Arrays;
 

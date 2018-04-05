@@ -17,13 +17,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
-import backend.stdcomm.communique.Communique;
-import backend.stdcomm.server.Host;
-import backend.stdcomm.server.ServerConn;
-import silentcrypt.core.util.BinaryData;
-import silentcrypt.core.util.RsaKeyPair;
-import silentcrypt.core.util.RsaUtil;
-import silentcrypt.core.util.U;
+import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.net.server.Host;
+import silentcrypt.comm.net.server.ServerConn;
+import silentcrypt.util.BinaryData;
+import silentcrypt.util.RsaKeyPair;
+import silentcrypt.util.RsaUtil;
+import silentcrypt.util.U;
 
 public class ScCa
 {
@@ -59,6 +59,25 @@ public class ScCa
 		return ref.get();
 	}
 
+	public static void echoServer()
+	{
+		int portNumber = ScCa.CA_PORT;
+
+		try (ServerSocket serverSocket = new ServerSocket(portNumber);
+				Socket clientSocket = serverSocket.accept();
+				PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+				BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));)
+		{
+			String inputLine;
+			while ((inputLine = in.readLine()) != null)
+				out.println(inputLine);
+		} catch (IOException e)
+		{
+			System.out.println("Exception caught when trying to listen on port " + portNumber + " or listening for a connection");
+			System.out.println(e.getMessage());
+		}
+	}
+
 	public static RSAKeyParameters getCaPublicKey(InetAddress addr, int port, int timeoutMilis) throws TimeoutException
 	{
 		Thread me = Thread.currentThread();
@@ -88,16 +107,34 @@ public class ScCa
 		return ref.get();
 	}
 
+	public static void main(String... strings) throws UnknownHostException, TimeoutException
+	{
+
+		RsaKeyPair key = RsaUtil.generateKeyPair();
+		// new Thread(() -> echoServer()).start();
+
+		ScCa.startCaThread(key);
+
+		InetAddress selfAddr = InetAddress.getByName("127.0.0.1");
+		U.p("My public key: " + U.toString(key.getPublicRsa()));
+		U.p("My private key: " + U.toString(key.getPrivateRsa()));
+		U.p("Server public key: " + U.toString(ScCa.getCaPublicKey(selfAddr, ScCa.CA_PORT, 60 * 1000)));
+		U.p("My certified public key: " + U.niceToString(ScCa.certifyCertificate(key.getPublicRsa(), selfAddr, ScCa.CA_PORT, 60 * 1000)));
+
+		// Keep the VM alive.
+		while (true)
+			;
+	}
+
 	public static void startCaThread(RsaKeyPair key)
 	{
 		Communique publicReply = new Communique();
 		publicReply.add(RsaUtil.toBytes(key.getPublicRsa()));
 		U.p("Listening for connections.");
-		Host.start(CA_PORT).listen(c -> c.getFields().size() < 2, (c, cons) -> {
+		Host.start(ScCa.CA_PORT).listen(c -> c.getFields().size() < 2, (c, cons) -> {
 			Communique reply = publicReply;
 
 			if (!c.getFields().isEmpty())
-			{
 				try
 				{
 					RSAKeyParameters orig = RsaUtil.fromBytes(c.getFields().get(0).dataArray());
@@ -114,50 +151,9 @@ public class ScCa
 					// TODO Handle unexpected RSA error.
 					e.printStackTrace();
 				}
-			}
 
 			U.p("Reply: " + reply);
 			cons.accept(reply);
 		});
-	}
-
-	public static void echoServer()
-	{
-		int portNumber = CA_PORT;
-
-		try (ServerSocket serverSocket = new ServerSocket(portNumber);
-				Socket clientSocket = serverSocket.accept();
-				PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-				BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));)
-		{
-			String inputLine;
-			while ((inputLine = in.readLine()) != null)
-			{
-				out.println(inputLine);
-			}
-		} catch (IOException e)
-		{
-			System.out.println("Exception caught when trying to listen on port " + portNumber + " or listening for a connection");
-			System.out.println(e.getMessage());
-		}
-	}
-
-	public static void main(String... strings) throws UnknownHostException, TimeoutException
-	{
-
-		RsaKeyPair key = RsaUtil.generateKeyPair();
-		// new Thread(() -> echoServer()).start();
-
-		startCaThread(key);
-
-		InetAddress selfAddr = InetAddress.getByName("127.0.0.1");
-		U.p("My public key: " + U.toString(key.getPublicRsa()));
-		U.p("My private key: " + U.toString(key.getPrivateRsa()));
-		U.p("Server public key: " + U.toString(getCaPublicKey(selfAddr, CA_PORT, 60 * 1000)));
-		U.p("My certified public key: " + U.niceToString(certifyCertificate(key.getPublicRsa(), selfAddr, CA_PORT, 60 * 1000)));
-
-		// Keep the VM alive.
-		while (true)
-			;
 	}
 }

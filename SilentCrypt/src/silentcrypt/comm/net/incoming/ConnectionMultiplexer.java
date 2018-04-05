@@ -1,4 +1,4 @@
-package backend.stdcomm.incoming;
+package silentcrypt.comm.net.incoming;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,8 +10,12 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import backend.stdcomm.communique.Communique;
+import silentcrypt.comm.net.communique.Communique;
 
+/**
+ * @author Andrew
+ * @author Michael
+ */
 public class ConnectionMultiplexer
 {
 	private List<Entry> handlers;

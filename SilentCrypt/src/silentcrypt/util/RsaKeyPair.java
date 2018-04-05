@@ -1,10 +1,12 @@
-package silentcrypt.core.util;
+package silentcrypt.util;
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
 /**
- * a holding class for public/private parameter pairs.
+ * A holding class for public/private parameter pairs. BouncyCastle needs to start using generics...
+ *
+ * @author Michael
  */
 public class RsaKeyPair extends AsymmetricCipherKeyPair
 {
@@ -13,13 +15,13 @@ public class RsaKeyPair extends AsymmetricCipherKeyPair
 		super(publicParam, privateParam);
 	}
 
-	public RSAKeyParameters getPublicRsa()
-	{
-		return U.quietCast(getPublic());
-	}
-
 	public RSAKeyParameters getPrivateRsa()
 	{
 		return U.quietCast(getPrivate());
+	}
+
+	public RSAKeyParameters getPublicRsa()
+	{
+		return U.quietCast(getPublic());
 	}
 }

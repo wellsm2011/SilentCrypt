@@ -1,15 +1,16 @@
-package silentcrypt.core.util;
+package silentcrypt.util;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
@@ -32,9 +33,13 @@ import java.util.zip.InflaterInputStream;
 
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
+/**
+ * @author Michael
+ */
 public class U
 {
-	private static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("LLL/dd/yyyy hh:mm:ss.SSS a").withZone(ZoneId.systemDefault()).withLocale(Locale.getDefault());
+	private static DateTimeFormatter	formatter		= DateTimeFormatter.ofPattern("LLL/dd/yyyy hh:mm:ss.SSS a").withZone(ZoneId.systemDefault()).withLocale(Locale.getDefault());
+	private static Charset				standardCharset	= StandardCharsets.UTF_16BE;
 
 	public static boolean anyMatch(String first, String... matches)
 	{
@@ -54,6 +59,23 @@ public class U
 			if (err != null)
 				msg.append("\nCaused By:");
 		}
+	}
+
+	@SafeVarargs
+	public static <T> Stream<T> concat(Stream<? extends T>... streams)
+	{
+		Stream<T> res = Stream.empty();
+		for (Stream<? extends T> s : streams)
+			res = Stream.concat(res, s);
+		return res;
+	}
+
+	public static <T> Stream<T> concat(Stream<Stream<? extends T>> streams)
+	{
+		Stream<T> res = Stream.empty();
+		for (Stream<? extends T> s : (Iterable<Stream<? extends T>>) streams::iterator)
+			res = Stream.concat(res, s);
+		return res;
 	}
 
 	public static InputStream download(String url)
@@ -99,51 +121,9 @@ public class U
 		return false;
 	}
 
-	public static String niceToString(Object in)
-	{
-		if (in == null)
-			return "null";
-		if (in instanceof int[])
-			return Arrays.toString((int[]) in);
-		if (in instanceof short[])
-			return Arrays.toString((short[]) in);
-		if (in instanceof byte[])
-			return Arrays.toString((byte[]) in);
-		if (in instanceof double[])
-			return Arrays.toString((double[]) in);
-		if (in instanceof float[])
-			return Arrays.toString((float[]) in);
-		if (in instanceof long[])
-			return Arrays.toString((long[]) in);
-		if (in instanceof char[])
-			return Arrays.toString((char[]) in);
-		if (in instanceof boolean[])
-			return Arrays.toString((boolean[]) in);
-		if (in instanceof Object[])
-			return Arrays.toString((Object[]) in);
-		return in.toString();
-	}
-
-	public static String toBase64(byte[] input)
-	{
-		return new String(Base64.getEncoder().encode(input));
-	}
-
 	public static byte[] fromBase64(String input)
 	{
 		return Base64.getDecoder().decode(input);
-	}
-
-	public static byte[] toBytes(String input)
-	{
-		try
-		{
-			return input.getBytes("UTF-8");
-		} catch (UnsupportedEncodingException e)
-		{
-			// We have big problems if we get here...
-			throw new UnsupportedOperationException(e);
-		}
 	}
 
 	@SafeVarargs
@@ -169,6 +149,31 @@ public class U
 		return chan.map(MapMode.READ_ONLY, 0, chan.size());
 	}
 
+	public static String niceToString(Object in)
+	{
+		if (in == null)
+			return "null";
+		if (in instanceof int[])
+			return Arrays.toString((int[]) in);
+		if (in instanceof short[])
+			return Arrays.toString((short[]) in);
+		if (in instanceof byte[])
+			return Arrays.toString((byte[]) in);
+		if (in instanceof double[])
+			return Arrays.toString((double[]) in);
+		if (in instanceof float[])
+			return Arrays.toString((float[]) in);
+		if (in instanceof long[])
+			return Arrays.toString((long[]) in);
+		if (in instanceof char[])
+			return Arrays.toString((char[]) in);
+		if (in instanceof boolean[])
+			return Arrays.toString((boolean[]) in);
+		if (in instanceof Object[])
+			return Arrays.toString((Object[]) in);
+		return in.toString();
+	}
+
 	public static void p(Object in)
 	{
 		U.p(U.niceToString(in));
@@ -192,6 +197,12 @@ public class U
 		sb.append('[').append(Thread.currentThread().getName()).append(']');
 		sb.append(message);
 		System.out.println(sb.toString());
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T> T quietCast(Object o)
+	{
+		return (T) o;
 	}
 
 	public static byte[] readFully(InputStream is) throws IOException
@@ -293,6 +304,55 @@ public class U
 		};
 	}
 
+	public static String toBase64(byte[] input)
+	{
+		return Base64.getEncoder().encodeToString(input);
+	}
+
+	public static ByteBuffer toBuff(String string)
+	{
+		byte[] data = string.getBytes(U.standardCharset);
+		ByteBuffer res = ByteBuffer.allocateDirect(data.length);
+		res.put(data);
+		res.rewind();
+		return res;
+	}
+
+	public static byte[] toBytes(String string)
+	{
+		return string.getBytes(U.standardCharset);
+	}
+
+	public static String toString(byte[] data)
+	{
+		return new String(data, U.standardCharset);
+	}
+
+	public static String toString(ByteBuffer buffer)
+	{
+		byte[] data;
+
+		if (!buffer.isReadOnly())
+			data = buffer.array();
+		else
+		{
+			data = new byte[buffer.remaining()];
+			buffer.get(data);
+		}
+
+		return new String(data, U.standardCharset);
+	}
+
+	public static String toString(RsaKeyPair key)
+	{
+		return "[publicKey=" + U.toString(key.getPublicRsa()) + ", private=" + U.toString(key.getPrivateRsa()) + "]";
+	}
+
+	public static String toString(RSAKeyParameters params)
+	{
+		return "[exp=" + params.getExponent() + ", mod=" + params.getModulus() + "]";
+	}
+
 	public static void w(String msg)
 	{
 		U.printWithTag("WARN", msg);
@@ -303,47 +363,5 @@ public class U
 		StringBuilder res = new StringBuilder(string);
 		U.appendStackTrace(res, e);
 		U.w(res.toString());
-	}
-
-	@SafeVarargs
-	public static <T> Stream<T> concat(Stream<? extends T>... streams)
-	{
-		Stream<T> res = Stream.empty();
-		for (Stream<? extends T> s : streams)
-			res = Stream.concat(res, s);
-		return res;
-	}
-
-	public static <T> Stream<T> concat(Stream<Stream<? extends T>> streams)
-	{
-		Stream<T> res = Stream.empty();
-		for (Stream<? extends T> s : (Iterable<Stream<? extends T>>) streams::iterator)
-			res = Stream.concat(res, s);
-		return res;
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <T> T quietCast(Object o)
-	{
-		return (T) o;
-	}
-
-	public static ByteBuffer toBuff(String string)
-	{
-		byte[] data = string.getBytes();
-		ByteBuffer res = ByteBuffer.allocateDirect(data.length);
-		res.put(data);
-		res.rewind();
-		return res;
-	}
-
-	public static String toString(RsaKeyPair key)
-	{
-		return "[publicKey=" + toString(key.getPublicRsa()) + ", private=" + toString(key.getPrivateRsa()) + "]";
-	}
-
-	public static String toString(RSAKeyParameters params)
-	{
-		return "[exp=" + params.getExponent() + ", mod=" + params.getModulus() + "]";
 	}
 }

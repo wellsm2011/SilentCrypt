@@ -1,15 +1,27 @@
-package backend.stdcomm.communique;
+package silentcrypt.comm.net.communique;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import silentcrypt.core.util.U;
+import silentcrypt.util.U;
 
+/**
+ * Represents the specific type of data contained in a CommuniqueField.
+ *
+ * @author Andrew
+ * @author Michael
+ */
 public enum Datatype
 {
+	/**
+	 * Represents purely binary data.
+	 */
 	BinaryBlob(0),
+	/**
+	 * Represents a String.
+	 */
 	String(1);
 
 	private static final Map<Short, Datatype> reverse;
@@ -30,6 +42,10 @@ public enum Datatype
 		return res;
 	}
 
+	/**
+	 * @param id
+	 * @return true if the given id is known by this version of the enum class.
+	 */
 	public static boolean isKnown(short id)
 	{
 		return Datatype.reverse.containsKey(id);
@@ -37,11 +53,14 @@ public enum Datatype
 
 	private short id;
 
-	Datatype(int id)
+	private Datatype(int id)
 	{
 		this.id = (short) id;
 	}
 
+	/**
+	 * @return the encoding id for this Datatype. Used when serializing fields.
+	 */
 	public short getId()
 	{
 		return this.id;

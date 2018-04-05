@@ -1,4 +1,4 @@
-package backend.stdcomm.server;
+package silentcrypt.comm.net.server;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -10,11 +10,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-import backend.stdcomm.communique.Communique;
-import backend.stdcomm.incoming.ConnectionMultiplexer;
-import backend.stdcomm.incoming.Entry;
-import backend.stdcomm.incoming.Filter;
-import silentcrypt.core.util.U;
+import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.net.incoming.ConnectionMultiplexer;
+import silentcrypt.comm.net.incoming.Entry;
+import silentcrypt.comm.net.incoming.Filter;
+import silentcrypt.util.U;
 
 public class ServerConn
 {
@@ -49,9 +49,9 @@ public class ServerConn
 	{
 		this.serverAddr = addr;
 		this.serverPort = port;
-		openConn();
-		startWatchDog();
-		startSender();
+		this.openConn();
+		this.startWatchDog();
+		this.startSender();
 	}
 
 	private Communique buildRegistrationPacket(String serviceID)
@@ -92,7 +92,7 @@ public class ServerConn
 
 	public ServerConn register(String serviceID)
 	{
-		send(buildRegistrationPacket(serviceID));
+		this.send(this.buildRegistrationPacket(serviceID));
 		return this;
 	}
 
@@ -119,7 +119,7 @@ public class ServerConn
 							U.e("Unable to send communique to server.", e);
 							this.sock = null;
 						}
-		}, "Communique Sender #" + hashCode());
+		}, "Communique Sender #" + this.hashCode());
 		sender.setDaemon(true);
 		sender.start();
 	}
@@ -137,14 +137,14 @@ public class ServerConn
 				} catch (NullPointerException e)
 				{
 					U.sleep(AerisStd.RETRY_PERIOD);
-					openConn();
+					this.openConn();
 				} catch (Throwable t)
 				{
 					U.e("Unable to connect to server, retrying...", t);
 					U.sleep(AerisStd.RETRY_PERIOD);
-					openConn();
+					this.openConn();
 				}
-		}, "Server Connection Watchdog #" + hashCode());
+		}, "Server Connection Watchdog #" + this.hashCode());
 		watcher.setDaemon(true);
 		watcher.setPriority(Thread.MIN_PRIORITY);
 		watcher.start();

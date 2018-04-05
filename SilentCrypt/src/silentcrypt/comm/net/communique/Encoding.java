@@ -1,4 +1,4 @@
-package backend.stdcomm.communique;
+package silentcrypt.comm.net.communique;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -7,8 +7,12 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import silentcrypt.core.util.U;
+import silentcrypt.util.U;
 
+/**
+ * @author Andrew
+ * @author Michael
+ */
 public enum Encoding
 {
 	Uncompressed(0, b -> b, b -> b),
@@ -47,7 +51,7 @@ public enum Encoding
 
 	private Function<ByteBuffer, ByteBuffer> decode;
 
-	Encoding(int id, Function<ByteBuffer, ByteBuffer> encode, Function<ByteBuffer, ByteBuffer> decode)
+	private Encoding(int id, Function<ByteBuffer, ByteBuffer> encode, Function<ByteBuffer, ByteBuffer> decode)
 	{
 		this.id = (short) id;
 		this.encode = encode;
