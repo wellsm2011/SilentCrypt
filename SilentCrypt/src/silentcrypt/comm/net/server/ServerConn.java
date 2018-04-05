@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 
 import silentcrypt.comm.net.communique.Communique;
 import silentcrypt.comm.net.incoming.ConnectionMultiplexer;
-import silentcrypt.comm.net.incoming.Entry;
+import silentcrypt.comm.net.incoming.CommuniqueListener;
 import silentcrypt.comm.net.incoming.Filter;
 import silentcrypt.util.U;
 
@@ -43,7 +43,7 @@ public class ServerConn
 	private int									serverPort;
 	private ConcurrentLinkedQueue<Communique>	sendQueue	= new ConcurrentLinkedQueue<>();
 
-	private List<Entry> handlers = new ArrayList<>();
+	private List<CommuniqueListener> handlers = new ArrayList<>();
 
 	protected ServerConn(InetAddress addr, int port)
 	{
@@ -72,7 +72,7 @@ public class ServerConn
 
 	public ServerConn listen(Filter filter, BiConsumer<Communique, Consumer<Communique>> handler)
 	{
-		this.handlers.add(new Entry(filter, handler));
+		this.handlers.add(new CommuniqueListener(filter, handler));
 		return this;
 	}
 
