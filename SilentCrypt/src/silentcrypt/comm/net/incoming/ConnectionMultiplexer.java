@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -19,7 +20,8 @@ import silentcrypt.comm.net.server.Listenable;
  */
 public class ConnectionMultiplexer implements Listenable<ConnectionMultiplexer>
 {
-	private List<CommuniqueListener> handlers;
+	private List<CommuniqueListener>						handlers;
+	private BiConsumer<Communique, Consumer<Communique>>	rejectionHandler	= null;
 
 	public ConnectionMultiplexer()
 	{
@@ -69,6 +71,18 @@ public class ConnectionMultiplexer implements Listenable<ConnectionMultiplexer>
 	}
 
 	/**
+	 * Sets a handler for Communiques which are not processed by any other handlers.
+	 *
+	 * @param handler
+	 * @return
+	 */
+	public ConnectionMultiplexer setRejectionHandler(BiConsumer<Communique, Consumer<Communique>> handler)
+	{
+		this.rejectionHandler = handler;
+		return this;
+	}
+
+	/**
 	 * Distributes the given Communique and reply in parallel among the registered handlers.
 	 *
 	 * @param incoming
@@ -77,10 +91,17 @@ public class ConnectionMultiplexer implements Listenable<ConnectionMultiplexer>
 	 */
 	public ConnectionMultiplexer distribute(Communique incoming, Consumer<Communique> reply)
 	{
-		this.handlers.forEach(e -> {
+		boolean handled = false;
+		for (CommuniqueListener e : this.handlers)
+		{
 			if (e.test(incoming))
+			{
 				new Thread(() -> e.accept(incoming, reply), "Communique Distribution Handoff").start();
-		});
+				handled = true;
+			}
+		}
+		if (!handled && this.rejectionHandler != null)
+			this.rejectionHandler.accept(incoming, reply);
 		return this;
 	}
 

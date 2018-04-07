@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BinaryOperator;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -40,6 +41,12 @@ public class U
 {
 	private static DateTimeFormatter	formatter		= DateTimeFormatter.ofPattern("LLL/dd/yyyy hh:mm:ss.SSS a").withZone(ZoneId.systemDefault()).withLocale(Locale.getDefault());
 	private static Charset				standardCharset	= StandardCharsets.UTF_16BE;
+
+	public static <T> Consumer<T> emptyConsumer()
+	{
+		return t -> {
+		};
+	}
 
 	public static boolean anyMatch(String first, String... matches)
 	{

@@ -19,7 +19,7 @@ public interface Listenable<T>
 	 * Registers a new listener which receives Communiques.
 	 *
 	 * @param listener
-	 * @return
+	 * @return this object
 	 */
 	public T listen(CommuniqueListener listener);
 

@@ -3,6 +3,8 @@ package silentcrypt.comm.net.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import silentcrypt.comm.net.communique.Communique;
@@ -130,6 +132,18 @@ public class Host implements Listenable<Host>
 			if (this.sock != null)
 				U.e("Finally able! Listening on " + AerisStd.PORT);
 		}
+	}
+
+	/**
+	 * Sets a handler for Communiques which are not processed by any other handlers.
+	 *
+	 * @param handler
+	 * @return this object
+	 */
+	public Host setRejectionHandler(BiConsumer<Communique, Consumer<Communique>> handler)
+	{
+		this.multiplexer.setRejectionHandler(handler);
+		return this;
 	}
 
 	@Override

@@ -24,7 +24,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 public class RsaUtil
 {
 	// Magic number for encryption.
-	private static final byte[] RSA_VERSION = "SC-RSA-0001".getBytes();
+	private static final String RSA_VERSION = "SC-RSA-0001";
 
 	/**
 	 * Performs RSA decryption on the given data using the given key.
@@ -54,10 +54,11 @@ public class RsaUtil
 
 		// Decrypt original message using AES and ensure we have the correct magic bytes signifying correct keys.
 		ByteBuffer result = AesUtil.decrypt(BinaryData.fromBytes(aesKey), BinaryData.fromBytes(aesCipher)).getBuffer();
-		byte[] magicNumber = new byte[RsaUtil.RSA_VERSION.length];
+		byte[] expectedMagicNumber = U.toBytes(RSA_VERSION);
+		byte[] magicNumber = new byte[expectedMagicNumber.length];
 		result.get(magicNumber);
 		for (int i = 0; i < magicNumber.length; ++i)
-			if (magicNumber[i] != RsaUtil.RSA_VERSION[i])
+			if (magicNumber[i] != expectedMagicNumber[i])
 				throw new InvalidCipherTextException("Wrong RSA key or data was not encrypted with this version of SilentCrypt.");
 
 		byte[] ret = new byte[result.remaining()];
@@ -89,8 +90,9 @@ public class RsaUtil
 		engine.init(true, key);
 
 		byte[] rsaCipher = engine.processBlock(aesKey, 0, aesKey.length);
-		ByteBuffer aesPlainText = ByteBuffer.allocate(data.size() + RsaUtil.RSA_VERSION.length);
-		aesPlainText.put(RsaUtil.RSA_VERSION);
+		byte[] magicNumber = U.toBytes(RSA_VERSION);
+		ByteBuffer aesPlainText = ByteBuffer.allocate(data.size() + magicNumber.length);
+		aesPlainText.put(magicNumber);
 		aesPlainText.put(data.getBuffer());
 		BinaryData aesCipher = AesUtil.encrypt(BinaryData.fromBytes(aesKey), BinaryData.fromBytes(aesPlainText.array()));
 
@@ -111,14 +113,15 @@ public class RsaUtil
 	 */
 	public static RSAKeyParameters fromBytes(byte[] key)
 	{
-		if (key.length < 4 + RsaUtil.RSA_VERSION.length)
+		byte[] expectedMagicNumber = U.toBytes(RSA_VERSION);
+		if (key.length < Integer.BYTES * 2 + expectedMagicNumber.length)
 			throw new IllegalArgumentException("Invalid encoded RSA data format: not enough data to extract key");
 
 		ByteBuffer wrapped = ByteBuffer.wrap(key);
-		byte[] magicNumber = new byte[RsaUtil.RSA_VERSION.length];
+		byte[] magicNumber = new byte[expectedMagicNumber.length];
 		wrapped.get(magicNumber);
 		for (int i = 0; i < magicNumber.length; ++i)
-			if (magicNumber[i] != RsaUtil.RSA_VERSION[i])
+			if (magicNumber[i] != expectedMagicNumber[i])
 				throw new IllegalArgumentException("RSA data was not encoded with this version of SilentCrypt.");
 
 		int expLen = wrapped.getInt();
@@ -129,8 +132,8 @@ public class RsaUtil
 		if (modLen < 1)
 			throw new IllegalArgumentException("Invalid encoded RSA data format: modulus length is negative (" + modLen + ")");
 
-		long expectedCapacity = expLen + (long) modLen + Integer.BYTES * 2;
-		if (wrapped.capacity() != expectedCapacity)
+		long expectedCapacity = expLen + (long) modLen;
+		if (wrapped.remaining() != expectedCapacity)
 			throw new IllegalArgumentException("Invalid encoded RSA data format: bad data length (decoded: " + expectedCapacity + ", actual: " + wrapped.capacity() + ")");
 
 		byte[] exp = new byte[expLen];
@@ -139,6 +142,30 @@ public class RsaUtil
 		wrapped.get(exp).get(mod);
 
 		return new RSAKeyParameters(false, new BigInteger(mod), new BigInteger(exp));
+	}
+
+	/**
+	 * Encodes a given key to a byte array. This operation can be reversed with {@link #fromBytes(byte[])}.
+	 *
+	 * @param key
+	 *            The RSA key to encode.
+	 * @return A byte array containing the components of the key.
+	 */
+	public static byte[] toBytes(RSAKeyParameters key)
+	{
+		byte[] exp = key.getExponent().toByteArray();
+		byte[] mod = key.getModulus().toByteArray();
+
+		// Format: [[exp length][mod length][exp][mod]]
+
+		byte[] magicNumber = U.toBytes(RSA_VERSION);
+		ByteBuffer res = ByteBuffer.allocate(Integer.BYTES * 2 + exp.length + mod.length + magicNumber.length);
+		res.put(magicNumber);
+		res.putInt(exp.length);
+		res.putInt(mod.length);
+		res.put(exp);
+		res.put(mod);
+		return res.array();
 	}
 
 	/**
@@ -165,26 +192,23 @@ public class RsaUtil
 		return new RsaKeyPair(U.quietCast(keyPair.getPublic()), U.quietCast(keyPair.getPrivate()));
 	}
 
-	/**
-	 * Encodes a given key to a byte array. This operation can be reversed with {@link #fromBytes(byte[])}.
-	 *
-	 * @param key
-	 *            The RSA key to encode.
-	 * @return A byte array containing the components of the key.
-	 */
-	public static byte[] toBytes(RSAKeyParameters key)
+	public static void main(String... strings) throws InvalidCipherTextException
 	{
-		byte[] exp = key.getExponent().toByteArray();
-		byte[] mod = key.getModulus().toByteArray();
+		U.p("--- Starting RSA Utility Tests ---");
 
-		// Format: [[exp length][mod length][exp][mod]]
+		String secret = "Top Secret Message!";
+		U.p("Generating a new RSA key...");
+		RsaKeyPair key = RsaUtil.generateKeyPair();
+		U.p("Public key: " + U.toString(key.getPublicRsa()));
+		U.p("Private key: " + U.toString(key.getPrivateRsa()));
 
-		ByteBuffer res = ByteBuffer.allocate(Integer.BYTES * 2 + exp.length + mod.length + RsaUtil.RSA_VERSION.length);
-		res.put(RsaUtil.RSA_VERSION);
-		res.putInt(exp.length);
-		res.putInt(mod.length);
-		res.put(exp);
-		res.put(mod);
-		return res.array();
+		byte[] publicBytes = toBytes(key.getPublicRsa());
+		U.p("Encoded public key: " + U.niceToString(publicBytes));
+		U.p("Decoded public key: " + U.toString(fromBytes(publicBytes)));
+
+		BinaryData encrypted = encrypt(BinaryData.fromString(secret), key.getPrivateRsa());
+		U.p("Original message: " + secret);
+		U.p("Encrypted message: " + U.niceToString(encrypted.getBytes()));
+		U.p("Decrypted message: " + decrypt(encrypted, key.getPublicRsa()));
 	}
 }
