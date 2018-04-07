@@ -19,22 +19,42 @@ import silentcrypt.util.U;
 public class Host implements Listenable<Host>
 {
 	/**
-	 * Starts a new server host. Uses standard port.
+	 * Starts a new server host in a daemon thread. Uses the standard AERIS port.
 	 *
 	 * @return a new Host
 	 */
 	public static Host start()
 	{
-		return Host.start(AerisStd.PORT);
+		return start(AerisStd.PORT, true);
 	}
 
 	/**
-	 * Start a new server host. Uses the given port.
+	 * Start a new server host in a daemon thread. Uses the given port.
 	 *
 	 * @param port
 	 * @return a new Host
 	 */
 	public static Host start(int port)
+	{
+		return start(port, true);
+	}
+
+	/**
+	 * Start a new server host. Uses the standard AERIS port.
+	 *
+	 * @return
+	 */
+	public static Host start(boolean isDaemon)
+	{
+		return start(AerisStd.PORT, isDaemon);
+	}
+
+	/**
+	 * Start a new server host. Uses the given port.
+	 *
+	 * @return
+	 */
+	public static Host start(int port, boolean isDaemon)
 	{
 		return new Host(() -> {
 			try
@@ -45,7 +65,7 @@ public class Host implements Listenable<Host>
 				U.e("Unable to bind to " + AerisStd.PORT + " " + e.getMessage());
 				return null;
 			}
-		});
+		}, isDaemon);
 	}
 
 	private Supplier<ServerSocket>	src;
@@ -53,7 +73,7 @@ public class Host implements Listenable<Host>
 
 	private ConnectionMultiplexer multiplexer;
 
-	private Host(Supplier<ServerSocket> sockSrc)
+	private Host(Supplier<ServerSocket> sockSrc, boolean isDaemon)
 	{
 		this.multiplexer = new ConnectionMultiplexer();
 		this.src = sockSrc;
@@ -70,7 +90,7 @@ public class Host implements Listenable<Host>
 					U.e("Error accepting connection. " + e.getMessage());
 				}
 		}, "[Host] incoming connection manager");
-		listener.setDaemon(true);
+		listener.setDaemon(isDaemon);
 		listener.start();
 	}
 
