@@ -50,7 +50,7 @@ public class Communique
 		}
 	}
 
-	public static final byte[] V_0_2 = U.toBytes("AERIS-COMM-0002");
+	public static final byte[] V_0_3 = U.toBytes("AERIS-COMM-0003");
 
 	/**
 	 * @param in
@@ -138,7 +138,7 @@ public class Communique
 	 */
 	public static byte[] getCurrentVersion()
 	{
-		return Arrays.copyOf(Communique.V_0_2, Communique.V_0_2.length);
+		return Arrays.copyOf(Communique.V_0_3, Communique.V_0_3.length);
 	}
 
 	/**
