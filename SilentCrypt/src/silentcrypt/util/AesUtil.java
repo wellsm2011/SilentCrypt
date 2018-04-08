@@ -36,8 +36,7 @@ public class AesUtil
 	 */
 	public static BinaryData decrypt(BinaryData key, BinaryData input) throws InvalidCipherTextException
 	{
-		AesUtil.cipher.setKey(key.getBytes());
-		return BinaryData.fromBytes(AesUtil.cipher.decrypt(input.getBytes()));
+		return BinaryData.fromBytes(AesUtil.cipher.setKey(key.getBytes()).decrypt(input.getBytes()));
 	}
 
 	/**
@@ -53,8 +52,7 @@ public class AesUtil
 	 */
 	public static BinaryData encrypt(BinaryData key, BinaryData input) throws InvalidCipherTextException
 	{
-		AesUtil.cipher.setKey(key.getBytes());
-		return BinaryData.fromBytes(AesUtil.cipher.encrypt(input.getBytes()));
+		return BinaryData.fromBytes(AesUtil.cipher.setKey(key.getBytes()).encrypt(input.getBytes()));
 	}
 
 	private final PaddedBufferedBlockCipher aesCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
@@ -63,17 +61,16 @@ public class AesUtil
 
 	private AesUtil()
 	{
-
 	}
 
 	public byte[] decrypt(byte[] input) throws DataLengthException, InvalidCipherTextException
 	{
-		return this.processing(input, false);
+		return processing(input, false);
 	}
 
 	public byte[] encrypt(byte[] input) throws DataLengthException, InvalidCipherTextException
 	{
-		return this.processing(input, true);
+		return processing(input, true);
 	}
 
 	private byte[] processing(byte[] input, boolean encrypt) throws DataLengthException, InvalidCipherTextException
@@ -88,12 +85,13 @@ public class AesUtil
 		return output;
 	}
 
-	public void setKey(byte[] key)
+	public AesUtil setKey(byte[] key)
 	{
 		// Ensure 256 bit key.
 		if (key.length != AesUtil.AES_KEY_SIZE)
 			key = Arrays.copyOf(key, AesUtil.AES_KEY_SIZE);
 
 		this.key = new KeyParameter(key);
+		return this;
 	}
 }

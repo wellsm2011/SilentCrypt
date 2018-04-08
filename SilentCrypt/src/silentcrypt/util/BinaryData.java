@@ -34,6 +34,11 @@ public class BinaryData
 		return new BinaryData(Arrays.clone(data));
 	}
 
+	public static BinaryData empty()
+	{
+		return new BinaryData(new byte[0]);
+	}
+
 	private ByteBuffer data;
 
 	private BinaryData(byte[] data)
@@ -66,4 +71,5 @@ public class BinaryData
 	{
 		return U.toString(this.data);
 	}
+
 }

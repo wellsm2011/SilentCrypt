@@ -3,8 +3,8 @@ package silentcrypt.comm.net.exception;
 import java.io.IOException;
 
 /**
- * @author Andrew
  * @author Michael
+ * @author Andrew
  */
 public class DecodingException extends IOException
 {
@@ -15,4 +15,8 @@ public class DecodingException extends IOException
 		super(string);
 	}
 
+	public DecodingException(String string, Throwable cause)
+	{
+		super(string, cause);
+	}
 }

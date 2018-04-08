@@ -58,8 +58,12 @@ public class CommuniqueField
 		res.putInt(this.size);
 	}
 
+	/**
+	 * @return A read only ByteBuffer containing the data in this field.
+	 */
 	public ByteBuffer data()
 	{
+		// Ensure nobody changes our original data buffer.
 		return this.data.asReadOnlyBuffer();
 	}
 
@@ -74,6 +78,11 @@ public class CommuniqueField
 		this.data.get(ret);
 		this.data.reset();
 		return ret;
+	}
+
+	public String dataString()
+	{
+		return U.toString(dataArray());
 	}
 
 	public boolean dataEquals(String data)
@@ -98,13 +107,11 @@ public class CommuniqueField
 	 * @throws IllegalStateException
 	 *             If this communique field is not encrypted using AES.
 	 */
-	public void decrypt(BinaryData aesKey) throws InvalidCipherTextException, IllegalStateException
+	public BinaryData decrypt(BinaryData aesKey) throws InvalidCipherTextException, IllegalStateException
 	{
 		if (this.encryption != Encryption.Aes256)
 			throw new IllegalStateException("Can't decrypt with " + Encryption.Aes256 + "; data is " + this.encryption + ".");
-		this.data = AesUtil.decrypt(BinaryData.fromBuffer(this.data), aesKey).getBuffer();
-		this.encryption = Encryption.Unencrypted;
-		this.size = this.data.remaining();
+		return AesUtil.decrypt(BinaryData.fromBuffer(this.data), aesKey);
 	}
 
 	/**
@@ -117,48 +124,11 @@ public class CommuniqueField
 	 * @throws IllegalStateException
 	 *             If this communique field is not encrypted using RSA.
 	 */
-	public void decrypt(RSAKeyParameters rsaKey) throws InvalidCipherTextException, IllegalStateException
+	public BinaryData decrypt(RSAKeyParameters rsaKey) throws InvalidCipherTextException, IllegalStateException
 	{
 		if (this.encryption != Encryption.Rsa4096)
 			throw new IllegalStateException("Can't decrypt with " + Encryption.Rsa4096 + "; data is " + this.encryption + ".");
-		this.data = RsaUtil.decrypt(BinaryData.fromBuffer(this.data), rsaKey).getBuffer();
-		this.encryption = Encryption.Unencrypted;
-		this.size = this.data.remaining();
-	}
-
-	/**
-	 * @param aesKey
-	 * @throws InvalidCipherTextException
-	 *             If there is a problem in the underlying encryption framework.
-	 * @throws IllegalStateException
-	 *             If this communique field is already encrypted.
-	 */
-	public void encrypt(BinaryData aesKey) throws InvalidCipherTextException, IllegalStateException
-	{
-		if (this.encryption != Encryption.Unencrypted)
-			throw new IllegalStateException("Data is already encrypted.");
-		this.data = AesUtil.encrypt(BinaryData.fromBuffer(this.data), aesKey).getBuffer();
-		this.encryption = Encryption.Aes256;
-		this.size = this.data.remaining();
-	}
-
-	/**
-	 * Attempts to encrypt this field with the given RSA key.
-	 *
-	 * @see silentcrypt.util.RsaUtil#encrypt(BinaryData, RSAKeyParameters)
-	 * @param rsaKey
-	 * @throws InvalidCipherTextException
-	 *             If there is a problem in the underlying encryption framework.
-	 * @throws IllegalStateException
-	 *             If this communique field is already encrypted.
-	 */
-	public void encrypt(RSAKeyParameters rsaKey) throws InvalidCipherTextException, IllegalStateException
-	{
-		if (this.encryption != Encryption.Unencrypted)
-			throw new IllegalStateException("Data is already encrypted.");
-		this.data = RsaUtil.encrypt(BinaryData.fromBuffer(this.data), rsaKey).getBuffer();
-		this.encryption = Encryption.Rsa4096;
-		this.size = this.data.remaining();
+		return RsaUtil.decrypt(BinaryData.fromBuffer(this.data), rsaKey);
 	}
 
 	/**

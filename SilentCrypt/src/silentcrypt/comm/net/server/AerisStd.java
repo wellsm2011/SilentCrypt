@@ -1,5 +1,8 @@
 package silentcrypt.comm.net.server;
 
+/**
+ * @author Andrew
+ */
 enum AerisStd
 {
 	SERVICE_REGISTRATION("AERIS-SERVICE-REGISTRATION"),

@@ -14,9 +14,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.zip.Adler32;
+
+import org.bouncycastle.crypto.InvalidCipherTextException;
+import org.bouncycastle.crypto.params.RSAKeyParameters;
 
 import silentcrypt.comm.net.exception.DecodingException;
 import silentcrypt.comm.net.exception.EncodingException;
+import silentcrypt.util.AesUtil;
+import silentcrypt.util.BinaryData;
+import silentcrypt.util.RsaUtil;
 import silentcrypt.util.U;
 
 /**
@@ -87,7 +94,9 @@ public class Communique
 					c.readOnly = true;
 					try
 					{
-						c.parseHeaderData(ByteBuffer.wrap(data));
+						int sigSize = c.parseHeaderData(ByteBuffer.wrap(data));
+						c.sig = new byte[sigSize];
+						input.read(c.sig);
 					} catch (DecodingException e)
 					{
 						U.e("Got malformed communique while parsing header: " + e.getMessage());
@@ -162,32 +171,45 @@ public class Communique
 		res += Long.BYTES;
 		// Nanoseconds in second
 		res += Integer.BYTES;
+		// Seconds since epoch (8 bytes)
+		res += Long.BYTES;
+		// Nanoseconds in second
+		res += Integer.BYTES;
 		// flags
 		res += Integer.BYTES;
 		// field count
+		res += Integer.BYTES;
+		// signature length
 		res += Integer.BYTES;
 		return res;
 	}
 
 	/**
 	 * @param data
-	 * @return a new Communique with one field representing the provided data
+	 * @return a new Communique with one field for each of the provided data arrays
 	 */
-	public static Communique of(byte[] data)
+	public static Communique of(byte[]... data)
 	{
-		return new Communique().add(data);
+		Communique ret = new Communique();
+		for (byte[] d : data)
+			ret.add(d);
+		return ret;
 	}
 
 	/**
 	 * @param s
-	 * @return a new Communique with one field representing the provided data
+	 * @return a new Communique with one field for each of the the provided strings
 	 */
-	public static Communique of(String s)
+	public static Communique of(String... strings)
 	{
-		return new Communique().add(s);
+		Communique ret = new Communique();
+		for (String s : strings)
+			ret.add(s);
+		return ret;
 	}
 
 	private byte[]	version	= Communique.getCurrentVersion();
+	private byte[]	sig		= new byte[0];
 	private int		flags;
 
 	private int fieldCount;
@@ -197,7 +219,7 @@ public class Communique
 	private boolean readOnly = false;
 
 	private Instant	sentTime;
-	private Instant	creationTime	= Instant.now();
+	private Instant	signingTime	= Instant.now();
 
 	/**
 	 * Creates an empty Communique with zero fields.
@@ -216,7 +238,8 @@ public class Communique
 	public Communique(ByteBuffer data) throws DecodingException
 	{
 		this.readOnly = true;
-		parseHeaderData(data);
+		this.sig = new byte[parseHeaderData(data)];
+		data.get(this.sig);
 
 		ensureValidCapacityForFields(data);
 
@@ -236,17 +259,31 @@ public class Communique
 	}
 
 	/**
-	 * Adds a new field to this Communique representing the given binary blob.
+	 * Adds a new RSA-encrypted field to this Communique representing the given binary blob.
+	 *
+	 * @param data
+	 * @param key
+	 * @return this object
+	 * @throws InvalidCipherTextException
+	 */
+	public Communique add(byte[] data, RSAKeyParameters key) throws InvalidCipherTextException
+	{
+		this.add(Datatype.BinaryBlob, Encoding.getDefault(), Encryption.Rsa4096, RsaUtil.encrypt(BinaryData.fromBytes(data), key).getBuffer());
+		return this;
+	}
+
+	/**
+	 * Adds a new AES-encrypted field to this Communique representing the given binary blob.
 	 *
 	 * @param data
 	 * @param modifier
 	 *            Called to allow modification (such as encryption) of the newly constructed CommuniqueField.
 	 * @return this object
+	 * @throws InvalidCipherTextException
 	 */
-	public Communique add(byte[] data, Consumer<CommuniqueField> modifier)
+	public Communique add(byte[] data, BinaryData key) throws InvalidCipherTextException
 	{
-		this.add(data);
-		modifier.accept(this.fields.get(this.fields.size() - 1));
+		this.add(Datatype.BinaryBlob, Encoding.getDefault(), Encryption.Aes256, AesUtil.encrypt(BinaryData.fromBytes(data), key).getBuffer());
 		return this;
 	}
 
@@ -267,6 +304,7 @@ public class Communique
 	{
 		if (this.readOnly)
 			throw new EncodingException("Please do not modify an existing communique.");
+		this.sig = new byte[0];
 		this.fieldCount++;
 		this.fields.add(new CommuniqueField(this.fields.size(), datType.getId(), enc.getId(), crypt.getId(), data));
 		return this;
@@ -307,6 +345,69 @@ public class Communique
 		return this;
 	}
 
+	private byte[] checksum()
+	{
+		Adler32 algorithm = new Adler32();
+
+		// A checksum for each field plus a timestamp.
+		ByteBuffer checksum = ByteBuffer.allocate(Long.BYTES * this.fieldCount + Long.BYTES + Integer.BYTES);
+		checksum.putLong(this.signingTime.getEpochSecond());
+		checksum.putInt(this.signingTime.getNano());
+		for (CommuniqueField field : this.fields)
+		{
+			algorithm.update(field.data());
+			checksum.putLong(algorithm.getValue());
+			algorithm.reset();
+		}
+		return checksum.array();
+	}
+
+	/**
+	 * @param key
+	 * @return this object
+	 * @throws InvalidCipherTextException
+	 */
+	public Communique sign(RSAKeyParameters key) throws InvalidCipherTextException
+	{
+		if (this.readOnly)
+			throw new IllegalStateException("Cannot sign a read only message.");
+		this.sig = RsaUtil.encrypt(BinaryData.fromBytes(checksum()), key).getBytes();
+		return this;
+	}
+
+	/**
+	 * @return true iff this message has been signed using the {@link #sign(RSAKeyParameters)} method.
+	 */
+	public boolean isSigned()
+	{
+		return this.sig.length != 0;
+	}
+
+	/**
+	 * @param key
+	 * @return True iff this message was signed with the complementary RSA key and the enclosed checksum matches.
+	 * @throws InvalidCipherTextException
+	 */
+	public boolean validate(RSAKeyParameters key) throws InvalidCipherTextException
+	{
+		if (!isSigned())
+			return false;
+
+		// Compare checksums.
+		byte[] checksum = checksum();
+		byte[] sig = RsaUtil.decrypt(BinaryData.fromBytes(this.sig), key).getBytes();
+		if (sig.length != checksum.length)
+			return false;
+
+		for (int i = 0; i < checksum.length; ++i)
+		{
+			if (checksum[i] != sig[i])
+				return false;
+		}
+
+		return true;
+	}
+
 	public byte[] bytes()
 	{
 		return compile().array();
@@ -316,6 +417,7 @@ public class Communique
 	{
 		int msgSize = 0;
 		msgSize += Communique.getMinHeaderSize();
+		msgSize += this.sig.length;
 		msgSize += this.fieldCount * Communique.getMinFieldDefSize();
 		msgSize += this.fields.stream().mapToInt(CommuniqueField::getSize).sum();
 		ByteBuffer res = ByteBuffer.allocate(msgSize);
@@ -323,16 +425,18 @@ public class Communique
 
 		// header data
 		res.put(Communique.getCurrentVersion());
+		res.putLong(this.signingTime.getEpochSecond());
+		res.putInt(this.signingTime.getNano());
 		Instant now = Instant.now();
 		res.putLong(now.getEpochSecond());
 		res.putInt(now.getNano());
 		res.putInt(this.flags);
 		res.putInt(this.fieldCount);
+		res.putInt(this.sig.length);
+		res.put(this.sig);
 
 		// field data
-		this.fields.forEach(f -> {
-			f.compile(res);
-		});
+		this.fields.forEach(f -> f.compile(res));
 
 		this.fields.forEach(f -> {
 			f.data().rewind();
@@ -413,12 +517,14 @@ public class Communique
 	}
 
 	/**
-	 * @return the time this object was created. For Communiques that are received by the system, this is the time that
-	 *         the header data was first parsed.
+	 * @return the time this object was most recently signed. For Communiques that are received by the system, this
+	 *         value is the reported creation time by the external system. If the Communique is signed,
+	 *         {@link #validate(RSAKeyParameters)} will verify that the timestamp was created by the sender. If it is
+	 *         not signed, this time usually represents the time the remote system began to construct the message.
 	 */
-	public Instant getCreationTime()
+	public Instant getTimestamp()
 	{
-		return this.creationTime;
+		return this.signingTime;
 	}
 
 	/**
@@ -433,20 +539,28 @@ public class Communique
 	 * @return the reported <i>send</i> time of this Communique. This value cannot be verified for Communiques that are
 	 *         received by the system, but will always be accurate for Communiques that the system sends.
 	 */
-	public Instant getTimestamp()
+	public Instant getSentTime()
 	{
 		return this.sentTime;
 	}
 
-	private void parseHeaderData(ByteBuffer data) throws DecodingException
+	/**
+	 * @return the number of bytes in the signature field
+	 * @throws DecodingException
+	 */
+	private int parseHeaderData(ByteBuffer data) throws DecodingException
 	{
 		// Parse header data
 		if (data.remaining() < Communique.getMinHeaderSize())
-			throw new DecodingException("Insufficient data, header too small.");
+			throw new DecodingException(
+					"Insufficient data; header too small for standard header. Expected at least " + Communique.getMinHeaderSize() + " bytes, but only got " + data.remaining() + ".");
 		this.version = new byte[Communique.getCurrentVersion().length];
 		data.get(this.version);
 		long epochSecond = data.getLong();
 		int nanos = data.getInt();
+		this.signingTime = Instant.ofEpochSecond(epochSecond, nanos);
+		epochSecond = data.getLong();
+		nanos = data.getInt();
 		this.sentTime = Instant.ofEpochSecond(epochSecond, nanos);
 		// TODO add communique version checking
 		data.order(ByteOrder.BIG_ENDIAN);
@@ -454,8 +568,12 @@ public class Communique
 		if (flag(Flag.Endieness))
 			data.order(ByteOrder.LITTLE_ENDIAN);
 		this.fieldCount = data.getInt();
+		// Extract signature, if any.
+		int sigLength = data.getInt();
+
 		if (this.fieldCount < 0)
 			throw new DecodingException("Invalid field count");
+		return sigLength;
 	}
 
 	/**

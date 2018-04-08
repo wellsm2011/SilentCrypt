@@ -2,6 +2,11 @@ package silentcrypt.comm.net.exception;
 
 import java.io.IOException;
 
+/**
+ * Thrown when a message was expecting a response, and instead was rejected.
+ *
+ * @author Michael
+ */
 public class MessageRejectedException extends IOException
 {
 	private static final long serialVersionUID = 841992865030814840L;

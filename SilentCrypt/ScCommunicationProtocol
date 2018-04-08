@@ -1,0 +1,85 @@
+Field Key:
+    [I] = Integrity ensured (encrypted with sender's private RSA key)
+    [R] = Privacy ensured (encrypted with receiver's public RSA key)
+    [A] = Privacy ensured (encrypted with shared AES channel key)
+
+Message Key:
+    [C] = Client-to-server communication
+    [S] = Server-to-client communication
+    [P] = Client-to-client communication
+
+
+
+
+All Messages
+    Field 1: Message Type
+    Field 2: Username (Server username is always SC-SRV)
+    Field 3: Timestamp (must be greater than the previous timestamp)
+    Field N (the last field): Checksum [I]
+    // Note: Checksum is a Adler32 checksum with built in integrity. It should be a checksum of all other fields in the message.
+
+Message Reject[CS]
+    Field 5: Reason
+    Field 6: Original Message ID
+    Field 7: Original Message Type
+
+Authentication Request[C] / Response[S]
+    Field 5: Public RSA key
+    Field 6: Certification
+
+Information Request[C]
+    Field 5 (Optional): Channel Name
+    Note: Returns list of channels if channel name is blank or missing.
+ 
+Information Response[S]
+    Field 5: Channel Name (or blank if listing channels)
+    Field 6+: List of items
+    Note: Returns list of channels if channel name is blank or missing.
+
+Channel Join / Create Request[C]
+    Field 5: Channel Name
+
+Channel Join Request[C]
+    Field 5: Channel Name
+
+Channel Join Authentication[S]
+    Field 5: Channel Name
+    Field 6: Public RSA key
+    Note: Uses the original client's username instead of SC-SRV.
+
+Channel Join Accept[P]
+    Field 5: Channel Name
+    Field 6: Client username
+    Field 7: AES Session Key [R]
+
+Channel Join Reject[P]
+    Field 5: Channel Name
+    Field 6: Client username
+
+Channel Leave Notice[S]
+    Field 5: Channel Name
+
+
+
+Channel Creation Announcement[S]
+    Field 7: Channel name
+    Field 8: Creator's username
+ 
+Channel Join Announcement[S] / Channel Leave Announcement[S]
+    Field 7: Channel name
+    Note: Uses the original client's username instead of SC-SRV.
+
+Server Join Announcement[S] / Server Leave Announcement[S]
+    Field 5: Client's Public RSA key
+    Field 6: Client's Certification
+    Note: Uses the original client's username instead of SC-SRV.
+ 
+
+ 
+Channel Message[P]
+    Field 5: Channel Name
+    Field 6+: Data [A]
+
+Client Message[P]
+    Field 5: Client username
+    Field 6+: Data [R]

@@ -48,6 +48,11 @@ public class U
 		};
 	}
 
+	public static void checksum(byte[] data)
+	{
+
+	}
+
 	public static boolean anyMatch(String first, String... matches)
 	{
 		for (String s : matches)

@@ -33,6 +33,15 @@ import silentcrypt.util.U;
  * {@link CertAuthHost#requireDistVerification(Predicate)} to test for the presence and validity of such information,
  * and the client may call {@link CertAuthClient#addCertificationAuthentication(Consumer)} and
  * {@link CertAuthClient#addDistributionAuthetication(Consumer)} to provide such information.
+ * <p>
+ * Public Key Distribution Request:<br>
+ * Field 1: distribution request identifier.<br>
+ * Field 2+: custom authentication information.
+ * <p>
+ * Certification Request: <br>
+ * Field 1: certification request identifier.<br>
+ * Field 2: RSA key to certify, encoded according to {@link RsaUtil#toBytes(RSAKeyParameters)}.<br>
+ * Field 3+: custom authentication information.
  *
  * @see CertAuthHost
  * @see CertAuthClient
@@ -187,7 +196,6 @@ public class CertAuthComm
 
 		private void processCertificationRequest(Communique communique, Consumer<Communique> client)
 		{
-			AtomicBoolean hasError = new AtomicBoolean(false);
 			RSAKeyParameters orig = RsaUtil.fromBytes(communique.getFields().get(1).dataArray());
 			byte[] origMod = orig.getModulus().toByteArray();
 			byte[] origExp = orig.getExponent().toByteArray();
@@ -196,22 +204,13 @@ public class CertAuthComm
 			toEncrypt.put(origMod).put(origExp);
 
 			// Construct our reply.
-			Communique reply = new Communique().add(MESSAGE_ACCEPT).add(toEncrypt.array(), cf -> {
-				try
-				{
-					cf.encrypt(this.key.getPrivateRsa());
-				} catch (InvalidCipherTextException | IllegalStateException e)
-				{
-					// Well. We got a really weird error... That sucks. ABORT!
-					hasError.set(true);
-					U.e("Error processing CA response.", e);
-				}
-			});
-
-			if (!hasError.get())
-				client.accept(reply);
-			else
+			try
+			{
+				client.accept(new Communique().add(MESSAGE_ACCEPT).add(toEncrypt.array(), this.key.getPrivateRsa()).sign(this.key.getPrivateRsa()));
+			} catch (InvalidCipherTextException e)
+			{
 				client.accept(MESSAGE_REJECT);
+			}
 		}
 	}
 
@@ -271,7 +270,7 @@ public class CertAuthComm
 
 			send(message, (c, cons) -> {
 				// Check to see if our request was accepted.
-				if (c.getFields().get(0).dataEquals(MESSAGE_ACCEPT) && c.fieldCount() >= 2)
+				if (c.fieldCount() >= 2 && c.getFields().get(0).dataEquals(MESSAGE_ACCEPT))
 					ref.set(c.getFields().get(1).dataArray());
 				// Wake the sleeping parent thread.
 				if (isWaiting.getAndSet(false))
@@ -351,7 +350,7 @@ public class CertAuthComm
 
 			send(message, (c, cons) -> {
 				// Check to see if our request was accepted.
-				if (c.getFields().get(0).dataEquals(MESSAGE_ACCEPT) && c.fieldCount() >= 2)
+				if (c.fieldCount() >= 2 && c.getFields().get(0).dataEquals(MESSAGE_ACCEPT))
 					ref.set(RsaUtil.fromBytes(c.getFields().get(1).dataArray()));
 				// Wake the sleeping parent thread.
 				if (isWaiting.getAndSet(false))
@@ -431,6 +430,7 @@ public class CertAuthComm
 
 	public static void main(String... strings) throws UnknownHostException, TimeoutException, MessageRejectedException, InterruptedException
 	{
+		U.p("--- Starting Certification Authority Tests ---");
 		U.p("Generating my RSA key...");
 		RsaKeyPair myKey = RsaUtil.generateKeyPair();
 		U.p("Generating the CA's RSA key...");
@@ -449,4 +449,5 @@ public class CertAuthComm
 		U.p("My certified public key: " + U.niceToString(caConnection.certify(myKey.getPublicRsa())));
 		U.p("Server public key: " + U.toString(caConnection.query()));
 	}
+
 }
