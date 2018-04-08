@@ -5,6 +5,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -208,9 +209,10 @@ public class Communique
 		return ret;
 	}
 
-	private byte[]	version	= Communique.getCurrentVersion();
-	private byte[]	sig		= new byte[0];
-	private int		flags;
+	private byte[]		version			= Communique.getCurrentVersion();
+	private byte[]		sig				= new byte[0];
+	private int			flags;
+	private BigInteger	connectionId	= BigInteger.ZERO;
 
 	private int fieldCount;
 
@@ -244,6 +246,32 @@ public class Communique
 		ensureValidCapacityForFields(data);
 
 		this.fields = extractFields(data);
+	}
+
+	/**
+	 * Sets this Communique's connection ID.
+	 *
+	 * @param id
+	 * @return
+	 */
+	public Communique setConnectionId(BigInteger id)
+	{
+		if (!this.readOnly)
+			throw new IllegalStateException("Connection ID can't be set for sending messages.");
+		if (this.connectionId != BigInteger.ZERO)
+			throw new IllegalStateException("Connection ID already set.");
+		if (id.signum() != 1)
+			throw new IllegalStateException("Connection ID must be positive.");
+		this.connectionId = id;
+		return this;
+	}
+
+	/**
+	 * @return the connection ID representing the source of this Communique.
+	 */
+	public BigInteger getConnectionId()
+	{
+		return this.connectionId;
 	}
 
 	/**
@@ -349,14 +377,11 @@ public class Communique
 	{
 		Adler32 algorithm = new Adler32();
 
-		// A checksum for each field plus a timestamp.
-		ByteBuffer checksum = ByteBuffer.allocate(Long.BYTES * this.fieldCount + Long.BYTES + Integer.BYTES);
+		// A checksum for all fields plus a timestamp.
+		ByteBuffer checksum = ByteBuffer.allocate(Long.BYTES + Long.BYTES + Integer.BYTES);
 		for (CommuniqueField field : this.fields)
-		{
 			algorithm.update(field.data());
-			checksum.putLong(algorithm.getValue());
-			algorithm.reset();
-		}
+		checksum.putLong(algorithm.getValue());
 		checksum.putLong(this.signingTime.getEpochSecond());
 		checksum.putInt(this.signingTime.getNano());
 		return checksum.array();
@@ -371,6 +396,7 @@ public class Communique
 	{
 		if (this.readOnly)
 			throw new IllegalStateException("Cannot sign a read only message.");
+		this.signingTime = Instant.now();
 		this.sig = RsaUtil.encrypt(BinaryData.fromBytes(checksum()), key).getBytes();
 		return this;
 	}
@@ -540,6 +566,17 @@ public class Communique
 	public List<CommuniqueField> getFields()
 	{
 		return this.fields;
+	}
+
+	/**
+	 * @param index
+	 * @return the field at the given index.
+	 * @throws IndexOutOfBoundsException
+	 *             if the index is out of range (index < 0 || index >= {@link #fieldCount()})
+	 */
+	public CommuniqueField getField(int index) throws IndexOutOfBoundsException
+	{
+		return this.fields.get(index);
 	}
 
 	/**

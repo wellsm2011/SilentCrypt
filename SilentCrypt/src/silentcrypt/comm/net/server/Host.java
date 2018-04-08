@@ -1,8 +1,10 @@
 package silentcrypt.comm.net.server;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -64,7 +66,7 @@ public class Host implements Listenable<Host>
 				return new ServerSocket(port);
 			} catch (IOException e)
 			{
-				U.e("Unable to bind to " + AerisStd.PORT + " " + e.getMessage());
+				U.e("Unable to bind to " + port + " " + e.getMessage());
 				return null;
 			}
 		}, isDaemon);
@@ -77,16 +79,20 @@ public class Host implements Listenable<Host>
 
 	private Host(Supplier<ServerSocket> sockSrc, boolean isDaemon)
 	{
+		AtomicReference<BigInteger> connectionId = new AtomicReference<>(BigInteger.ONE);
 		this.multiplexer = new ConnectionMultiplexer();
 		this.src = sockSrc;
 		init();
+
+		U.p("Waiting for connections...");
 		Thread listener = new Thread(() -> {
 			for (;;)
 				try
 				{
-					U.p("Waiting for connection...");
+					BigInteger id = connectionId.getAndAccumulate(BigInteger.ONE, (f, s) -> f.add(s));
 					Socket t = this.sock.accept();
-					new Thread(() -> handle(t), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
+					U.p("Recieved opening connection from " + t.getRemoteSocketAddress());
+					new Thread(() -> handle(t, id), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
 				} catch (IOException e)
 				{
 					U.e("Error accepting connection. " + e.getMessage());
@@ -96,14 +102,15 @@ public class Host implements Listenable<Host>
 		listener.start();
 	}
 
-	private void handle(Socket t)
+	private void handle(Socket t, BigInteger connectionId)
 	{
-		U.p("Recieved opening connection from " + t.getRemoteSocketAddress());
 		try
 		{
 			Supplier<Communique> src = Communique.from(t.getInputStream());
-			Communique c;
-			while ((c = src.get()) != null)
+			Communique c = src.get();
+			while (c != null)
+			{
+				c.setConnectionId(connectionId);
 				this.multiplexer.distribute(c, comm -> {
 					try
 					{
@@ -114,6 +121,8 @@ public class Host implements Listenable<Host>
 						e.printStackTrace();
 					}
 				});
+				c = src.get();
+			}
 		} catch (IOException e)
 		{
 			U.e("No more data?....", e);
