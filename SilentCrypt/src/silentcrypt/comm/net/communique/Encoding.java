@@ -10,8 +10,8 @@ import java.util.stream.Collectors;
 import silentcrypt.util.U;
 
 /**
- * @author Andrew
- * @author Michael
+ * @author Andrew Binns
+ * @author Michael Wells
  */
 public enum Encoding
 {

@@ -1,7 +1,7 @@
 package silentcrypt.comm.net.server;
 
 /**
- * @author Andrew
+ * @author Andrew Binns
  */
 enum AerisStd
 {

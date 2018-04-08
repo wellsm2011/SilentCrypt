@@ -10,8 +10,8 @@ import silentcrypt.util.U;
 /**
  * Represents the specific type of data contained in a CommuniqueField.
  *
- * @author Andrew
- * @author Michael
+ * @author Andrew Binns
+ * @author Michael Wells
  */
 public enum Datatype
 {

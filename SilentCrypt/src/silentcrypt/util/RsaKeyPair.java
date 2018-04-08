@@ -6,7 +6,7 @@ import org.bouncycastle.crypto.params.RSAKeyParameters;
 /**
  * A holding class for public/private parameter pairs. BouncyCastle needs to start using generics...
  *
- * @author Michael
+ * @author Michael Wells
  */
 public class RsaKeyPair extends AsymmetricCipherKeyPair
 {

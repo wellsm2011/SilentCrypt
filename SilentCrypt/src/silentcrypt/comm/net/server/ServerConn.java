@@ -16,8 +16,8 @@ import silentcrypt.util.U;
 /**
  * Provides ease-of-use methods for sending and receiving Communiques over a TCP connection.
  *
- * @author Andrew
- * @author Michael
+ * @author Andrew Binns
+ * @author Michael Wells
  */
 public class ServerConn implements Listenable<ServerConn>
 {

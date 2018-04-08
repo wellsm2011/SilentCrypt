@@ -35,7 +35,7 @@ import java.util.zip.InflaterInputStream;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
 /**
- * @author Michael
+ * @author Michael Wells
  */
 public class U
 {

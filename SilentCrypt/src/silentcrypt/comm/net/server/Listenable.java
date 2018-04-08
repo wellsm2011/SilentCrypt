@@ -8,7 +8,7 @@ import silentcrypt.comm.net.incoming.CommuniqueListener;
 import silentcrypt.comm.net.incoming.Filter;
 
 /**
- * @author Michael
+ * @author Michael Wells
  * @param <T>
  *            the class of the parent object which is implementing Listenable.
  */

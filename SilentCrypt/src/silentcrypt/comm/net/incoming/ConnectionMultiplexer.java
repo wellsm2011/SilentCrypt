@@ -15,8 +15,8 @@ import silentcrypt.comm.net.server.Listenable;
 /**
  * A class for managing a set of listeners which receive new Communiques and distributing messages to them.
  *
- * @author Andrew
- * @author Michael
+ * @author Andrew Binns
+ * @author Michael Wells
  */
 public class ConnectionMultiplexer implements Listenable<ConnectionMultiplexer>
 {

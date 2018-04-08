@@ -19,7 +19,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 /**
  * Contains utility functions for working with RSA public key encryption.
  *
- * @author Michael
+ * @author Michael Wells
  */
 public class RsaUtil
 {

@@ -10,8 +10,8 @@ import silentcrypt.comm.net.communique.Communique;
  * Represents the pairing of a Filter which tests Communiques to decide whether to receive them and a BiConsumer which
  * processes accepted Communiques.
  *
- * @author Michael
- * @author Andrew
+ * @author Michael Wells
+ * @author Andrew Binns
  */
 public class CommuniqueListener implements Filter, BiConsumer<Communique, Consumer<Communique>>
 {

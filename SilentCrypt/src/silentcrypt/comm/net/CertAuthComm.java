@@ -45,7 +45,7 @@ import silentcrypt.util.U;
  *
  * @see CertAuthHost
  * @see CertAuthClient
- * @author Michael
+ * @author Michael Wells
  */
 public class CertAuthComm
 {

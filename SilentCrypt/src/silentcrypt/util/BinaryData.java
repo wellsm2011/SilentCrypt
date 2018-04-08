@@ -8,7 +8,7 @@ import org.bouncycastle.util.Arrays;
  * Contains some abstract binary data which can be encoded to and from byte buffers, byte arrays or Strings representing
  * either a normal string or base64 binary data.
  *
- * @author Michael
+ * @author Michael Wells
  */
 public class BinaryData
 {

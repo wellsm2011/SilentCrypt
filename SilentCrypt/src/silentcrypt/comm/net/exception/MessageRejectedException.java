@@ -5,7 +5,7 @@ import java.io.IOException;
 /**
  * Thrown when a message was expecting a response, and instead was rejected.
  *
- * @author Michael
+ * @author Michael Wells
  */
 public class MessageRejectedException extends IOException
 {

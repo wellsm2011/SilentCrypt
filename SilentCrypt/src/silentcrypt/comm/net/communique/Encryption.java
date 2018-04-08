@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 import silentcrypt.util.U;
 
 /**
- * @author Michael
+ * @author Michael Wells
  */
 public enum Encryption
 {

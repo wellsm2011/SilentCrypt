@@ -14,8 +14,8 @@ import silentcrypt.util.U;
  * Represents an individual field in a Communique.
  *
  * @see silentcrypt.comm.net.communique.Communique
- * @author Andrew Binns
- * @author Michael Wells
+ * @author Andrew Binns Binns
+ * @author Michael Wells Wells
  */
 public class CommuniqueField
 {

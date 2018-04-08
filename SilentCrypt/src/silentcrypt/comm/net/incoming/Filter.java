@@ -5,7 +5,7 @@ import java.util.function.Predicate;
 import silentcrypt.comm.net.communique.Communique;
 
 /**
- * @author Andrew
+ * @author Andrew Binns
  */
 public interface Filter extends Predicate<Communique>
 {

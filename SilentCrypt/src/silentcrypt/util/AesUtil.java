@@ -12,7 +12,7 @@ import org.bouncycastle.crypto.params.KeyParameter;
 /**
  * Provides support for AES-256 encryption.
  *
- * @author Michael
+ * @author Michael Wells
  */
 public class AesUtil
 {

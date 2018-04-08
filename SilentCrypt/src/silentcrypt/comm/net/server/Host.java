@@ -17,8 +17,8 @@ import silentcrypt.util.U;
 /**
  * Provides ease-of-use methods for accepting TCP connections which send and receive Communiques.
  *
- * @author Michael
- * @author Andrew
+ * @author Michael Wells
+ * @author Andrew Binns
  */
 public class Host implements Listenable<Host>
 {
@@ -46,6 +46,7 @@ public class Host implements Listenable<Host>
 	/**
 	 * Start a new server host. Uses the standard AERIS port.
 	 *
+	 * @param isDaemon
 	 * @return
 	 */
 	public static Host start(boolean isDaemon)
@@ -56,6 +57,8 @@ public class Host implements Listenable<Host>
 	/**
 	 * Start a new server host. Uses the given port.
 	 *
+	 * @param port
+	 * @param isDaemon
 	 * @return
 	 */
 	public static Host start(int port, boolean isDaemon)
@@ -84,7 +87,6 @@ public class Host implements Listenable<Host>
 		this.src = sockSrc;
 		init();
 
-		U.p("Waiting for connections...");
 		Thread listener = new Thread(() -> {
 			for (;;)
 				try
@@ -99,6 +101,8 @@ public class Host implements Listenable<Host>
 				}
 		}, "[Host] incoming connection manager");
 		listener.setDaemon(isDaemon);
+
+		U.p("Waiting for connections...");
 		listener.start();
 	}
 

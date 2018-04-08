@@ -1,7 +1,7 @@
 package silentcrypt.comm.net.exception;
 
 /**
- * @author Andrew
+ * @author Andrew Binns
  */
 public class EncodingException extends RuntimeException
 {
