@@ -428,7 +428,7 @@ public class CertAuthComm
 		}
 	}
 
-	public static void main(String... strings) throws UnknownHostException, TimeoutException, MessageRejectedException, InterruptedException
+	public static void main(String... strings) throws UnknownHostException, TimeoutException, MessageRejectedException, InterruptedException, InvalidCipherTextException
 	{
 		U.p("--- Starting Certification Authority Tests ---");
 		U.p("Generating my RSA key...");
@@ -448,6 +448,14 @@ public class CertAuthComm
 
 		U.p("My certified public key: " + U.niceToString(caConnection.certify(myKey.getPublicRsa())));
 		U.p("Server public key: " + U.toString(caConnection.query()));
+
+		Communique signTest = Communique.of("Top Secret Message!");
+		U.p("Signing a communique with my private key...");
+		signTest.sign(myKey.getPrivateRsa());
+		U.p("Verifying with my public key...");
+		U.p(signTest.validate(myKey.getPublicRsa()) ? "Validated!" : "Not validated!");
+		U.p("Verifying with ca's public key...");
+		U.p(signTest.validate(caKey.getPublicRsa()) ? "Validated!" : "Not validated!");
 	}
 
 }

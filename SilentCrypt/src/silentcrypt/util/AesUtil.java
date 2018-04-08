@@ -6,6 +6,7 @@ import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.engines.AESEngine;
 import org.bouncycastle.crypto.modes.CBCBlockCipher;
+import org.bouncycastle.crypto.paddings.PKCS7Padding;
 import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 
@@ -55,7 +56,7 @@ public class AesUtil
 		return BinaryData.fromBytes(AesUtil.cipher.setKey(key.getBytes()).encrypt(input.getBytes()));
 	}
 
-	private final PaddedBufferedBlockCipher aesCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+	private final PaddedBufferedBlockCipher aesCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new PKCS7Padding());
 
 	private KeyParameter key = null;
 
@@ -79,8 +80,15 @@ public class AesUtil
 
 		byte[] output = new byte[this.aesCipher.getOutputSize(input.length)];
 		int bytesWrittenOut = this.aesCipher.processBytes(input, 0, input.length, output, 0);
+		bytesWrittenOut += this.aesCipher.doFinal(output, bytesWrittenOut);
 
-		this.aesCipher.doFinal(output, bytesWrittenOut);
+		if (bytesWrittenOut != output.length)
+		{
+			byte[] realOutput = new byte[bytesWrittenOut];
+			for (int i = 0; i < realOutput.length; ++i)
+				realOutput[i] = output[i];
+			output = realOutput;
+		}
 
 		return output;
 	}
@@ -93,5 +101,21 @@ public class AesUtil
 
 		this.key = new KeyParameter(key);
 		return this;
+	}
+
+	public static void main(String... strings) throws InvalidCipherTextException
+	{
+		U.p("--- Starting AES Tests ---");
+		BinaryData secret = BinaryData.fromString("Top Secret Message!!!!!!!!!");
+		BinaryData key = BinaryData.fromString("Secret Key");
+
+		U.p("Secret: " + secret);
+		U.p("Secret Bytes: " + U.niceToString(secret.getBytes()));
+		U.p("Key: " + key);
+		BinaryData cipherText = encrypt(key, secret);
+		U.p("Cipher Bytes: " + U.niceToString(cipherText.getBytes()));
+		BinaryData plainText = decrypt(key, cipherText);
+		U.p("Plaintext: " + plainText.toString());
+		U.p("Plaintext Bytes: " + U.niceToString(plainText.getBytes()));
 	}
 }

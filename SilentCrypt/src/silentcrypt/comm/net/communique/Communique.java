@@ -351,14 +351,14 @@ public class Communique
 
 		// A checksum for each field plus a timestamp.
 		ByteBuffer checksum = ByteBuffer.allocate(Long.BYTES * this.fieldCount + Long.BYTES + Integer.BYTES);
-		checksum.putLong(this.signingTime.getEpochSecond());
-		checksum.putInt(this.signingTime.getNano());
 		for (CommuniqueField field : this.fields)
 		{
 			algorithm.update(field.data());
 			checksum.putLong(algorithm.getValue());
 			algorithm.reset();
 		}
+		checksum.putLong(this.signingTime.getEpochSecond());
+		checksum.putInt(this.signingTime.getNano());
 		return checksum.array();
 	}
 
@@ -388,21 +388,28 @@ public class Communique
 	 * @return True iff this message was signed with the complementary RSA key and the enclosed checksum matches.
 	 * @throws InvalidCipherTextException
 	 */
-	public boolean validate(RSAKeyParameters key) throws InvalidCipherTextException
+	public boolean validate(RSAKeyParameters key)
 	{
 		if (!isSigned())
 			return false;
 
 		// Compare checksums.
-		byte[] checksum = checksum();
-		byte[] sig = RsaUtil.decrypt(BinaryData.fromBytes(this.sig), key).getBytes();
-		if (sig.length != checksum.length)
-			return false;
-
-		for (int i = 0; i < checksum.length; ++i)
+		try
 		{
-			if (checksum[i] != sig[i])
+			byte[] checksum = checksum();
+			byte[] sig = RsaUtil.decrypt(BinaryData.fromBytes(this.sig), key).getBytes();
+
+			if (sig.length != checksum.length)
 				return false;
+
+			for (int i = 0; i < checksum.length; ++i)
+			{
+				if (sig[i] != checksum[i])
+					return false;
+			}
+		} catch (InvalidCipherTextException ex)
+		{
+			return false;
 		}
 
 		return true;
