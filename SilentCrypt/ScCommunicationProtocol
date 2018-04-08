@@ -12,74 +12,72 @@ Message Key:
 
 
 All Messages
+    Must be a signed Communique (also provides a timestamp)
     Field 1: Message Type
     Field 2: Username (Server username is always SC-SRV)
-    Field 3: Timestamp (must be greater than the previous timestamp)
-    Field N (the last field): Checksum [I]
-    // Note: Checksum is a Adler32 checksum with built in integrity. It should be a checksum of all other fields in the message.
 
 Message Reject[CS]
-    Field 5: Reason
-    Field 6: Original Message ID
-    Field 7: Original Message Type
+    Field 3: Reason
+    Field 4: Original Message ID
+    Field 5: Original Message Type
 
 Authentication Request[C] / Response[S]
-    Field 5: Public RSA key
-    Field 6: Certification
+    Field 3: Public RSA key
+    Field 4: Certification
 
 Information Request[C]
-    Field 5 (Optional): Channel Name
+    Field 3 (Optional): Channel Name
     Note: Returns list of channels if channel name is blank or missing.
  
 Information Response[S]
-    Field 5: Channel Name (or blank if listing channels)
-    Field 6+: List of items
+    Field 3: Channel Name (or blank if listing channels)
+    Field 4+: List of items (if listing clients, fields alternate between usernames and public RSA keys)
     Note: Returns list of channels if channel name is blank or missing.
 
 Channel Join / Create Request[C]
-    Field 5: Channel Name
+    Field 3: Channel Name
 
 Channel Join Request[C]
-    Field 5: Channel Name
+    Field 3: Channel Name
 
 Channel Join Authentication[S]
-    Field 5: Channel Name
-    Field 6: Public RSA key
+    Field 3: Channel Name
+    Field 4: Public RSA key
     Note: Uses the original client's username instead of SC-SRV.
 
 Channel Join Accept[P]
-    Field 5: Channel Name
-    Field 6: Client username
-    Field 7: AES Session Key [R]
+    Field 3: Channel Name
+    Field 4: Client username
+    Field 5: AES Session Key [R]
 
 Channel Join Reject[P]
-    Field 5: Channel Name
-    Field 6: Client username
+    Field 3: Channel Name
+    Field 4: Client username
 
 Channel Leave Notice[S]
-    Field 5: Channel Name
+    Field 3: Channel Name
 
 
 
 Channel Creation Announcement[S]
-    Field 7: Channel name
-    Field 8: Creator's username
+    Field 3: Channel name
+    Field 4: Creator's username
  
 Channel Join Announcement[S] / Channel Leave Announcement[S]
-    Field 7: Channel name
+    Field 3: Channel name
     Note: Uses the original client's username instead of SC-SRV.
 
 Server Join Announcement[S] / Server Leave Announcement[S]
-    Field 5: Client's Public RSA key
-    Field 6: Client's Certification
+    Field 3: Client's Public RSA key
+    Field 4: Client's Certification
     Note: Uses the original client's username instead of SC-SRV.
  
 
  
 Channel Message[P]
-    Field 5: Channel Name
-    Field 6+: Data [A]
+    Field 3: Channel Name
+    Field 4+: Data [A]
 
 Client Message[P]
-    Field 5: Client username
-    Field 6+: Data [R]
+    Field 3: Client username
+    Field 4+: Data [R]

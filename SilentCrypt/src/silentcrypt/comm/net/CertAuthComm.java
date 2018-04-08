@@ -452,10 +452,10 @@ public class CertAuthComm
 		Communique signTest = Communique.of("Top Secret Message!");
 		U.p("Signing a communique with my private key...");
 		signTest.sign(myKey.getPrivateRsa());
-		U.p("Verifying with my public key...");
-		U.p(signTest.validate(myKey.getPublicRsa()) ? "Validated!" : "Not validated!");
-		U.p("Verifying with ca's public key...");
-		U.p(signTest.validate(caKey.getPublicRsa()) ? "Validated!" : "Not validated!");
+		U.p("Verifying with my public key... (Should be valid)");
+		U.p(signTest.validate(myKey.getPublicRsa()) ? "Validated!" : "Invalid signature!");
+		U.p("Verifying with ca's public key... (Should be invalid)");
+		U.p(signTest.validate(caKey.getPublicRsa()) ? "Validated!" : "Invalid signature!");
 	}
 
 }
