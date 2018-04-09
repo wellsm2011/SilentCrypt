@@ -1,4 +1,4 @@
-package silentcrypt.comm.net;
+package silentcrypt.core;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -14,11 +14,11 @@ import java.util.function.Predicate;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
-import silentcrypt.comm.net.communique.Communique;
-import silentcrypt.comm.net.exception.MessageRejectedException;
-import silentcrypt.comm.net.incoming.Filter;
-import silentcrypt.comm.net.server.Host;
-import silentcrypt.comm.net.server.ServerConn;
+import silentcrypt.comm.communique.Communique;
+import silentcrypt.comm.exception.MessageRejectedException;
+import silentcrypt.comm.incoming.Filter;
+import silentcrypt.comm.server.Host;
+import silentcrypt.comm.server.ServerConn;
 import silentcrypt.util.RsaKeyPair;
 import silentcrypt.util.RsaUtil;
 import silentcrypt.util.U;
@@ -52,7 +52,7 @@ public class CertAuthComm
 	/**
 	 * The default port that clients and hosts will use to communicate unless another port is given.
 	 */
-	public static final int DEFAULT_PORT = 777;
+	public static final int DEFAULT_PORT = 7778;
 
 	private static final String	CERT_COMM_VERSION	= "SC-CERT-0001";
 	private static final String	DIST_COMM_VERSION	= "SC-DIST-0001";

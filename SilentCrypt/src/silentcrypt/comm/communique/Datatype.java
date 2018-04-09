@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.communique;
+package silentcrypt.comm.communique;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -22,7 +22,11 @@ public enum Datatype
 	/**
 	 * Represents a String.
 	 */
-	String(1);
+	String(1),
+	/**
+	 * Represents a moment in time.
+	 */
+	Instant(2);
 
 	private static final Map<Short, Datatype> reverse;
 

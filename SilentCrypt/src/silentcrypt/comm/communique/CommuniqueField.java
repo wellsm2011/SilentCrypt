@@ -1,6 +1,7 @@
-package silentcrypt.comm.net.communique;
+package silentcrypt.comm.communique;
 
 import java.nio.ByteBuffer;
+import java.time.Instant;
 
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
@@ -13,7 +14,7 @@ import silentcrypt.util.U;
 /**
  * Represents an individual field in a Communique.
  *
- * @see silentcrypt.comm.net.communique.Communique
+ * @see silentcrypt.comm.communique.Communique
  * @author Andrew Binns Binns
  * @author Michael Wells Wells
  */
@@ -59,48 +60,6 @@ public class CommuniqueField
 	}
 
 	/**
-	 * @return A read only ByteBuffer containing the data in this field.
-	 */
-	public ByteBuffer data()
-	{
-		// Ensure nobody changes our original data buffer.
-		return this.data.asReadOnlyBuffer();
-	}
-
-	/**
-	 * @return This field's data as a raw byte array. Note that if this field is currently encrypted, this function will
-	 *         return encrypted data.
-	 */
-	public byte[] dataArray()
-	{
-		this.data.mark();
-		byte[] ret = new byte[this.data.remaining()];
-		this.data.get(ret);
-		this.data.reset();
-		return ret;
-	}
-
-	public String dataString()
-	{
-		return U.toString(dataArray());
-	}
-
-	public boolean dataEquals(String data)
-	{
-		return dataEquals(U.toBytes(data));
-	}
-
-	public boolean dataEquals(byte[] data)
-	{
-		return this.dataEquals(ByteBuffer.wrap(data));
-	}
-
-	public boolean dataEquals(ByteBuffer data)
-	{
-		return this.data.compareTo(data) == 0;
-	}
-
-	/**
 	 * @param aesKey
 	 * @throws InvalidCipherTextException
 	 *             If there is a problem in the underlying encryption framework.
@@ -129,6 +88,57 @@ public class CommuniqueField
 		if (this.encryption != Encryption.Rsa4096)
 			throw new IllegalStateException("Can't decrypt with " + Encryption.Rsa4096 + "; data is " + this.encryption + ".");
 		return RsaUtil.decrypt(BinaryData.fromBuffer(this.data), rsaKey);
+	}
+
+	/**
+	 * @return A read only ByteBuffer containing the data in this field.
+	 */
+	public ByteBuffer data()
+	{
+		// Ensure nobody changes our original data buffer.
+		return this.data.asReadOnlyBuffer();
+	}
+
+	/**
+	 * @return This field's data as a raw byte array. Note that if this field is currently encrypted, this function will
+	 *         return encrypted data.
+	 */
+	public byte[] dataArray()
+	{
+		this.data.mark();
+		byte[] ret = new byte[this.data.remaining()];
+		this.data.get(ret);
+		this.data.reset();
+		return ret;
+	}
+
+	public String dataString() throws IllegalStateException
+	{
+		if (this.datatype != Datatype.String)
+			throw new IllegalStateException("Field is not a string.");
+		return U.toString(dataArray());
+	}
+
+	public Instant dataInstant() throws IllegalStateException
+	{
+		if (this.datatype != Datatype.Instant)
+			throw new IllegalStateException("Field is not an instant.");
+		return U.toInstant(data());
+	}
+
+	public boolean dataEquals(String data)
+	{
+		return dataEquals(U.toBytes(data));
+	}
+
+	public boolean dataEquals(byte[] data)
+	{
+		return this.dataEquals(ByteBuffer.wrap(data));
+	}
+
+	public boolean dataEquals(ByteBuffer data)
+	{
+		return this.data.compareTo(data) == 0;
 	}
 
 	/**

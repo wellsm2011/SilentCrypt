@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.server;
+package silentcrypt.comm.server;
 
 /**
  * @author Andrew Binns

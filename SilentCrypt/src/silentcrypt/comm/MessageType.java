@@ -1,4 +1,4 @@
-package silentcrypt.comm.net;
+package silentcrypt.comm;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -6,7 +6,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.communique.Communique;
+import silentcrypt.comm.communique.Encryption;
 
 public enum MessageType
 {
@@ -85,11 +86,11 @@ public enum MessageType
 	 */
 	SERVER_LEAVE_ANNOUNCEMENT(15, 4),
 	/**
-	 *
+	 * Extra fields: Channel name, data (may be multiple fields)
 	 */
 	CHANNEL_MESSAGE(16, 4),
 	/**
-	 *
+	 * Extra fields: username, data (may be multiple fields)
 	 */
 	CLIENT_MESSAGE(17, 4);
 
@@ -123,7 +124,8 @@ public enum MessageType
 	/**
 	 * Returns the message type of a given Communique, validating that the basic structure of fields matches the
 	 * message. If this method returns non-null, the Communique is guaranteed to have at least the minimum number of
-	 * fields and a correctly formed .
+	 * fields, and the first two fields are guaranteed to be unencrypted, and the first field describes a valid message
+	 * type.
 	 *
 	 * @param c
 	 * @return
@@ -131,6 +133,9 @@ public enum MessageType
 	public static MessageType get(Communique c)
 	{
 		if (c.fieldCount() < 2)
+			return null;
+
+		if (c.getField(0).getEncryption() != Encryption.Unencrypted || c.getField(0).getEncryption() != Encryption.Unencrypted)
 			return null;
 
 		MessageType type = get(c.getField(0).data().getShort());

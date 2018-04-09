@@ -1,8 +1,8 @@
-package silentcrypt.comm.net.incoming;
+package silentcrypt.comm.incoming;
 
 import java.util.function.Predicate;
 
-import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.communique.Communique;
 
 /**
  * @author Andrew Binns

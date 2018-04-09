@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.communique;
+package silentcrypt.comm.communique;
 
 import java.util.Arrays;
 import java.util.Collections;

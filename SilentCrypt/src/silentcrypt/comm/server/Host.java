@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.server;
+package silentcrypt.comm.server;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -9,9 +9,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import silentcrypt.comm.net.communique.Communique;
-import silentcrypt.comm.net.incoming.CommuniqueListener;
-import silentcrypt.comm.net.incoming.ConnectionMultiplexer;
+import silentcrypt.comm.communique.Communique;
+import silentcrypt.comm.incoming.CommuniqueListener;
+import silentcrypt.comm.incoming.ConnectionMultiplexer;
 import silentcrypt.util.U;
 
 /**

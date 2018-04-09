@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.communique;
+package silentcrypt.comm.communique;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -15,13 +15,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.zip.Adler32;
+import java.util.zip.CRC32;
 
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
-import silentcrypt.comm.net.exception.DecodingException;
-import silentcrypt.comm.net.exception.EncodingException;
+import silentcrypt.comm.exception.DecodingException;
+import silentcrypt.comm.exception.EncodingException;
 import silentcrypt.util.AesUtil;
 import silentcrypt.util.BinaryData;
 import silentcrypt.util.RsaUtil;
@@ -31,8 +31,8 @@ import silentcrypt.util.U;
  * Represents an abstract message which can be sent to or received from other systems or processes via any InputStream
  * or OutputStream.
  *
- * @author Andrew
- * @author Michael
+ * @author Andrew Binns
+ * @author Michael Wells
  */
 public class Communique
 {
@@ -275,6 +275,18 @@ public class Communique
 	}
 
 	/**
+	 * Copies the given CommuniqueField into the next slot of this message.
+	 *
+	 * @param field
+	 * @return
+	 */
+	public Communique add(CommuniqueField field)
+	{
+		this.add(field.getDatatype(), field.getEncoding(), field.getEncryption(), field.data());
+		return this;
+	}
+
+	/**
 	 * Adds a new field to this Communique representing the given binary blob.
 	 *
 	 * @param data
@@ -375,7 +387,7 @@ public class Communique
 
 	private byte[] checksum()
 	{
-		Adler32 algorithm = new Adler32();
+		CRC32 algorithm = new CRC32();
 
 		// A checksum for all fields plus a timestamp.
 		ByteBuffer checksum = ByteBuffer.allocate(Long.BYTES + Long.BYTES + Integer.BYTES);
@@ -441,6 +453,9 @@ public class Communique
 		return true;
 	}
 
+	/**
+	 * @return a serialized verson of this Communique.
+	 */
 	public byte[] bytes()
 	{
 		return compile().array();
@@ -458,11 +473,8 @@ public class Communique
 
 		// header data
 		res.put(Communique.getCurrentVersion());
-		res.putLong(this.signingTime.getEpochSecond());
-		res.putInt(this.signingTime.getNano());
-		Instant now = Instant.now();
-		res.putLong(now.getEpochSecond());
-		res.putInt(now.getNano());
+		U.toBuff(this.signingTime, res);
+		U.toBuff(Instant.now(), res);
 		res.putInt(this.flags);
 		res.putInt(this.fieldCount);
 		res.putInt(this.sig.length);
@@ -600,12 +612,8 @@ public class Communique
 					"Insufficient data; header too small for standard header. Expected at least " + Communique.getMinHeaderSize() + " bytes, but only got " + data.remaining() + ".");
 		this.version = new byte[Communique.getCurrentVersion().length];
 		data.get(this.version);
-		long epochSecond = data.getLong();
-		int nanos = data.getInt();
-		this.signingTime = Instant.ofEpochSecond(epochSecond, nanos);
-		epochSecond = data.getLong();
-		nanos = data.getInt();
-		this.sentTime = Instant.ofEpochSecond(epochSecond, nanos);
+		this.signingTime = U.toInstant(data);
+		this.sentTime = U.toInstant(data);
 		// TODO add communique version checking
 		data.order(ByteOrder.BIG_ENDIAN);
 		this.flags = data.getInt();

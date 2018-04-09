@@ -1,10 +1,10 @@
-package silentcrypt.comm.net.incoming;
+package silentcrypt.comm.incoming;
 
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import silentcrypt.comm.net.communique.Communique;
+import silentcrypt.comm.communique.Communique;
 
 /**
  * Represents the pairing of a Filter which tests Communiques to decide whether to receive them and a BiConsumer which

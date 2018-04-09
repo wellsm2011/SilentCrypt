@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.exception;
+package silentcrypt.comm.exception;
 
 /**
  * @author Andrew Binns

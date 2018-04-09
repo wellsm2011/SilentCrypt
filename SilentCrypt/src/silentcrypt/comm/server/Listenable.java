@@ -1,11 +1,11 @@
-package silentcrypt.comm.net.server;
+package silentcrypt.comm.server;
 
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-import silentcrypt.comm.net.communique.Communique;
-import silentcrypt.comm.net.incoming.CommuniqueListener;
-import silentcrypt.comm.net.incoming.Filter;
+import silentcrypt.comm.communique.Communique;
+import silentcrypt.comm.incoming.CommuniqueListener;
+import silentcrypt.comm.incoming.Filter;
 
 /**
  * @author Michael Wells

@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.incoming;
+package silentcrypt.comm.incoming;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -9,8 +9,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import silentcrypt.comm.net.communique.Communique;
-import silentcrypt.comm.net.server.Listenable;
+import silentcrypt.comm.communique.Communique;
+import silentcrypt.comm.server.Listenable;
 
 /**
  * A class for managing a set of listeners which receive new Communiques and distributing messages to them.

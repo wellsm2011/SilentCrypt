@@ -48,11 +48,6 @@ public class U
 		};
 	}
 
-	public static void checksum(byte[] data)
-	{
-
-	}
-
 	public static boolean anyMatch(String first, String... matches)
 	{
 		for (String s : matches)
@@ -338,6 +333,21 @@ public class U
 	public static String toString(byte[] data)
 	{
 		return new String(data, U.standardCharset);
+	}
+
+	public static Instant toInstant(ByteBuffer data)
+	{
+		return Instant.ofEpochSecond(data.getLong(), data.getInt());
+	}
+
+	public static void toBuff(Instant instant, ByteBuffer buffer)
+	{
+		buffer.putLong(instant.getEpochSecond()).putInt(instant.getNano());
+	}
+
+	public static ByteBuffer toBuff(Instant instant)
+	{
+		return ByteBuffer.allocate(Long.BYTES + Integer.BYTES).putLong(instant.getEpochSecond()).putInt(instant.getNano());
 	}
 
 	public static String toString(ByteBuffer buffer)

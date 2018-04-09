@@ -1,4 +1,4 @@
-package silentcrypt.comm.net.communique;
+package silentcrypt.comm.communique;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
