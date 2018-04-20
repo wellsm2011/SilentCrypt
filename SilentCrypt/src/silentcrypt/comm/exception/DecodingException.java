@@ -1,12 +1,10 @@
 package silentcrypt.comm.exception;
 
-import java.io.IOException;
-
 /**
  * @author Michael Wells
  * @author Andrew Binns
  */
-public class DecodingException extends IOException
+public class DecodingException extends RuntimeException
 {
 	private static final long serialVersionUID = 1L;
 

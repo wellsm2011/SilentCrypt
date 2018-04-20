@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -156,6 +157,7 @@ public class ServerConn implements Listenable<ServerConn>
 				try
 				{
 					this.sock.getOutputStream().write(msg);
+					WritableByteChannel ch;
 					U.sleep(AerisStd.HEARTBEAT_PERIOD);
 				} catch (NullPointerException e)
 				{

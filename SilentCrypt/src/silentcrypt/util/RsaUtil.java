@@ -26,6 +26,16 @@ public class RsaUtil
 	// Magic number for encryption.
 	private static final String RSA_VERSION = "SC-RSA-0001";
 
+	public static ByteBuffer decrypt(ByteBuffer encrypted, RSAKeyParameters key) throws InvalidCipherTextException
+	{
+		return ByteBuffer.wrap(RsaUtil.encrypt(U.toBytes(encrypted), key));
+	}
+
+	public static ByteBuffer encrypt(ByteBuffer data, RSAKeyParameters key) throws InvalidCipherTextException
+	{
+		return ByteBuffer.wrap(RsaUtil.encrypt(U.toBytes(data), key));
+	}
+
 	/**
 	 * Performs RSA decryption on the given data using the given key.
 	 *
@@ -37,9 +47,9 @@ public class RsaUtil
 	 * @throws InvalidCipherTextException
 	 *             If the given RSA key is incorrect, or the encrypted data was not created by this class.
 	 */
-	public static BinaryData decrypt(BinaryData encrypted, RSAKeyParameters key) throws InvalidCipherTextException
+	public static byte[] decrypt(byte[] encrypted, RSAKeyParameters key) throws InvalidCipherTextException
 	{
-		ByteBuffer message = encrypted.getBuffer();
+		ByteBuffer message = ByteBuffer.wrap(encrypted);
 		int rsaBlockSize = message.getInt();
 		byte[] rsaBlock = new byte[rsaBlockSize];
 		message.get(rsaBlock);
@@ -53,7 +63,7 @@ public class RsaUtil
 		message.get(aesCipher);
 
 		// Decrypt original message using AES and ensure we have the correct magic bytes signifying correct keys.
-		ByteBuffer result = AesUtil.decrypt(BinaryData.fromBytes(aesKey), BinaryData.fromBytes(aesCipher)).getBuffer();
+		ByteBuffer result = ByteBuffer.wrap(AesUtil.decrypt(aesKey, aesCipher));
 		byte[] expectedMagicNumber = U.toBytes(RSA_VERSION);
 		byte[] magicNumber = new byte[expectedMagicNumber.length];
 		result.get(magicNumber);
@@ -63,7 +73,7 @@ public class RsaUtil
 
 		byte[] ret = new byte[result.remaining()];
 		result.get(ret);
-		return BinaryData.fromBytes(ret);
+		return ret;
 	}
 
 	/**
@@ -77,7 +87,7 @@ public class RsaUtil
 	 * @return A binary blob containing the encrypted data.
 	 * @throws InvalidCipherTextException
 	 */
-	public static BinaryData encrypt(BinaryData data, RSAKeyParameters key) throws InvalidCipherTextException
+	public static byte[] encrypt(byte[] data, RSAKeyParameters key) throws InvalidCipherTextException
 	{
 		// End result will be [[key length][rsa-encrypted aes key][aes encrypted data]]
 
@@ -91,17 +101,17 @@ public class RsaUtil
 
 		byte[] rsaCipher = engine.processBlock(aesKey, 0, aesKey.length);
 		byte[] magicNumber = U.toBytes(RSA_VERSION);
-		ByteBuffer aesPlainText = ByteBuffer.allocate(data.size() + magicNumber.length);
+		ByteBuffer aesPlainText = ByteBuffer.allocate(data.length + magicNumber.length);
 		aesPlainText.put(magicNumber);
-		aesPlainText.put(data.getBuffer());
-		BinaryData aesCipher = AesUtil.encrypt(BinaryData.fromBytes(aesKey), BinaryData.fromBytes(aesPlainText.array()));
+		aesPlainText.put(data);
+		byte[] aesCipher = AesUtil.encrypt(aesKey, aesPlainText.array());
 
-		ByteBuffer message = ByteBuffer.allocate(rsaCipher.length + aesCipher.size() + Integer.BYTES);
+		ByteBuffer message = ByteBuffer.allocate(rsaCipher.length + aesCipher.length + Integer.BYTES);
 		message.putInt(rsaCipher.length);
 		message.put(rsaCipher);
-		message.put(aesCipher.getBuffer());
+		message.put(aesCipher);
 
-		return BinaryData.fromBytes(message.array());
+		return message.array();
 	}
 
 	/**
@@ -206,9 +216,9 @@ public class RsaUtil
 		U.p("Encoded public key: " + U.niceToString(publicBytes));
 		U.p("Decoded public key: " + U.toString(fromBytes(publicBytes)));
 
-		BinaryData encrypted = encrypt(BinaryData.fromString(secret), key.getPrivateRsa());
+		byte[] encrypted = encrypt(U.toBytes(secret), key.getPrivateRsa());
 		U.p("Original message: " + secret);
-		U.p("Encrypted message: " + U.niceToString(encrypted.getBytes()));
+		U.p("Encrypted message: " + U.niceToString(encrypted));
 		U.p("Decrypted message: " + decrypt(encrypted, key.getPublicRsa()));
 	}
 }

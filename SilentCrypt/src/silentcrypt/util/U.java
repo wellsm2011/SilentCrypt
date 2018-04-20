@@ -325,6 +325,19 @@ public class U
 		return res;
 	}
 
+	public static byte[] toBytes(ByteBuffer buff)
+	{
+		try
+		{
+			return buff.array();
+		} catch (UnsupportedOperationException ex)
+		{
+			byte[] ret = new byte[buff.remaining()];
+			buff.get(ret);
+			return ret;
+		}
+	}
+
 	public static byte[] toBytes(String string)
 	{
 		return string.getBytes(U.standardCharset);

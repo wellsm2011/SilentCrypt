@@ -15,6 +15,7 @@ import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
 import silentcrypt.comm.communique.Communique;
+import silentcrypt.comm.communique.MetaSpace;
 import silentcrypt.comm.exception.MessageRejectedException;
 import silentcrypt.comm.incoming.Filter;
 import silentcrypt.comm.server.Host;
@@ -109,8 +110,8 @@ public class CertAuthComm
 		private static Communique MESSAGE_REJECT = new Communique().add(CertAuthComm.MESSAGE_REJECT);
 
 		RsaKeyPair				key;
-		Predicate<Communique>	isDistReq	= c -> c.fieldCount() > 0 && c.getFields().get(0).dataEquals(U.toBytes(CertAuthComm.DIST_COMM_VERSION));
-		Predicate<Communique>	isCertReq	= c -> c.fieldCount() > 1 && c.getFields().get(0).dataEquals(U.toBytes(CertAuthComm.CERT_COMM_VERSION));
+		Predicate<Communique>	isDistReq	= c -> c.fieldCount() > 0 && c.getFields().get(0).data(String.class).equals(U.toBytes(CertAuthComm.DIST_COMM_VERSION));
+		Predicate<Communique>	isCertReq	= c -> c.fieldCount() > 1 && c.getFields().get(0).data(String.class).equals(U.toBytes(CertAuthComm.CERT_COMM_VERSION));
 		Predicate<Communique>	distFilter	= c -> true;
 		Predicate<Communique>	certFilter	= c -> true;
 		boolean					started		= false;
@@ -196,7 +197,7 @@ public class CertAuthComm
 
 		private void processCertificationRequest(Communique communique, Consumer<Communique> client)
 		{
-			RSAKeyParameters orig = RsaUtil.fromBytes(communique.getFields().get(1).dataArray());
+			RSAKeyParameters orig = communique.getFields().get(1).data(RSAKeyParameters.class);
 			byte[] origMod = orig.getModulus().toByteArray();
 			byte[] origExp = orig.getExponent().toByteArray();
 
@@ -206,7 +207,7 @@ public class CertAuthComm
 			// Construct our reply.
 			try
 			{
-				client.accept(new Communique().add(MESSAGE_ACCEPT).add(toEncrypt.array(), this.key.getPrivateRsa()).sign(this.key.getPrivateRsa()));
+				client.accept(new Communique().add(MESSAGE_ACCEPT).add(toEncrypt.array()).sign());
 			} catch (InvalidCipherTextException e)
 			{
 				client.accept(MESSAGE_REJECT);
@@ -270,8 +271,8 @@ public class CertAuthComm
 
 			send(message, (c, cons) -> {
 				// Check to see if our request was accepted.
-				if (c.fieldCount() >= 2 && c.getFields().get(0).dataEquals(MESSAGE_ACCEPT))
-					ref.set(c.getFields().get(1).dataArray());
+				if (c.fieldCount() >= 2 && c.getField(0).data(String.class).equals(MESSAGE_ACCEPT))
+					ref.set(c.getField(1).data(byte[].class));
 				// Wake the sleeping parent thread.
 				if (isWaiting.getAndSet(false))
 					me.interrupt();
@@ -350,8 +351,8 @@ public class CertAuthComm
 
 			send(message, (c, cons) -> {
 				// Check to see if our request was accepted.
-				if (c.fieldCount() >= 2 && c.getFields().get(0).dataEquals(MESSAGE_ACCEPT))
-					ref.set(RsaUtil.fromBytes(c.getFields().get(1).dataArray()));
+				if (c.fieldCount() >= 2 && c.getField(0).data(String.class).equals(MESSAGE_ACCEPT))
+					ref.set(RsaUtil.fromBytes(c.getField(1).data(byte[].class)));
 				// Wake the sleeping parent thread.
 				if (isWaiting.getAndSet(false))
 					me.interrupt();
@@ -451,7 +452,8 @@ public class CertAuthComm
 
 		Communique signTest = Communique.of("Top Secret Message!");
 		U.p("Signing a communique with my private key...");
-		signTest.sign(myKey.getPrivateRsa());
+		signTest.getMetaSpace().set(MetaSpace.RSA_KEY, myKey.getPrivateRsa());
+		signTest.sign();
 		U.p("Verifying with my public key... (Should be valid)");
 		U.p(signTest.validate(myKey.getPublicRsa()) ? "Validated!" : "Invalid signature!");
 		U.p("Verifying with ca's public key... (Should be invalid)");

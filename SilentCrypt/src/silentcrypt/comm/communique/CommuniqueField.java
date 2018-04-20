@@ -1,179 +1,120 @@
 package silentcrypt.comm.communique;
 
 import java.nio.ByteBuffer;
-import java.time.Instant;
 
-import org.bouncycastle.crypto.InvalidCipherTextException;
-import org.bouncycastle.crypto.params.RSAKeyParameters;
-
-import silentcrypt.util.AesUtil;
-import silentcrypt.util.BinaryData;
-import silentcrypt.util.RsaUtil;
+import silentcrypt.comm.exception.DecodingException;
+import silentcrypt.comm.exception.EncodingException;
 import silentcrypt.util.U;
 
 /**
  * Represents an individual field in a Communique.
  *
  * @see silentcrypt.comm.communique.Communique
- * @author Andrew Binns Binns
- * @author Michael Wells Wells
+ * @author Andrew Binns
+ * @author Michael Wells
  */
 public class CommuniqueField
 {
 	private int			fieldIndex;
-	private Datatype	datatype;
+	private Datatype<?>	datatype;
 	private Encoding	encoding;
-	private Encryption	encryption;
-	private int			size;
-	private ByteBuffer	data;
+	private Object		data		= null;
+	private ByteBuffer	encodedData	= null;
 
-	CommuniqueField(int fieldIndex, short datatype, short encoding, short encryption, ByteBuffer data)
+	private transient MetaSpace metaSpace;
+
+	// New field.
+	<T> CommuniqueField(MetaSpace ms, int fieldIndex, Datatype<T> datatype, Encoding encoding, T data)
 	{
-		this(fieldIndex, datatype, encoding, encryption, data.remaining(), data);
+		this.fieldIndex = fieldIndex;
+		this.datatype = datatype;
+		this.encoding = encoding;
+		this.data = data;
+		this.metaSpace = ms;
 	}
 
-	CommuniqueField(int fieldIndex, short datatype, short encoding, short encryption, int size)
+	// From input stream.
+	CommuniqueField(MetaSpace ms, int fieldIndex, short datatype, short encoding)
 	{
 		this.fieldIndex = fieldIndex;
 		this.datatype = Datatype.get(datatype);
 		this.encoding = Encoding.get(encoding);
-		this.encryption = Encryption.get(encryption);
-		this.size = size;
+		this.data = null;
+		this.metaSpace = ms;
 	}
 
-	CommuniqueField(int fieldIndex, short datatype, short encoding, short encryption, int size, ByteBuffer data)
+	// From buffer.
+	CommuniqueField(MetaSpace ms, int fieldIndex, short datatype, short encoding, ByteBuffer data)
 	{
 		this.fieldIndex = fieldIndex;
 		this.datatype = Datatype.get(datatype);
 		this.encoding = Encoding.get(encoding);
-		this.encryption = Encryption.get(encryption);
-		this.size = size;
-		this.data = data.asReadOnlyBuffer();
+		this.encodedData = data.asReadOnlyBuffer();
+		this.metaSpace = ms;
 	}
 
-	void compile(ByteBuffer res)
+	Object ensureData() throws DecodingException
+	{
+		if (this.data == null)
+			this.data = this.datatype.decode(this.encoding.decode(this.encodedData, this.metaSpace));
+		return this.data;
+	}
+
+	ByteBuffer ensureEncodedData() throws EncodingException
+	{
+		if (this.encodedData == null)
+			this.encodedData = this.encoding.encode(this.datatype.encode(U.quietCast(this.data)), this.metaSpace);
+		return this.encodedData;
+	}
+
+	void compile(ByteBuffer res) throws EncodingException
 	{
 		res.putShort(this.datatype.getId());
 		res.putShort(this.encoding.getId());
-		res.putShort(this.encryption.getId());
-		res.putInt(this.size);
-	}
-
-	/**
-	 * @param aesKey
-	 * @throws InvalidCipherTextException
-	 *             If there is a problem in the underlying encryption framework.
-	 * @throws IllegalStateException
-	 *             If this communique field is not encrypted using AES.
-	 */
-	public BinaryData decrypt(BinaryData aesKey) throws InvalidCipherTextException, IllegalStateException
-	{
-		if (this.encryption != Encryption.Aes256)
-			throw new IllegalStateException("Can't decrypt with " + Encryption.Aes256 + "; data is " + this.encryption + ".");
-		return AesUtil.decrypt(BinaryData.fromBuffer(this.data), aesKey);
-	}
-
-	/**
-	 * Attempts to decrypt this field using the given RSA key.
-	 *
-	 * @see silentcrypt.util.RsaUtil#decrypt(BinaryData, RSAKeyParameters)
-	 * @param rsaKey
-	 * @throws InvalidCipherTextException
-	 *             If there is a problem in the underlying encryption framework.
-	 * @throws IllegalStateException
-	 *             If this communique field is not encrypted using RSA.
-	 */
-	public BinaryData decrypt(RSAKeyParameters rsaKey) throws InvalidCipherTextException, IllegalStateException
-	{
-		if (this.encryption != Encryption.Rsa4096)
-			throw new IllegalStateException("Can't decrypt with " + Encryption.Rsa4096 + "; data is " + this.encryption + ".");
-		return RsaUtil.decrypt(BinaryData.fromBuffer(this.data), rsaKey);
-	}
-
-	/**
-	 * @return A read only ByteBuffer containing the data in this field.
-	 */
-	public ByteBuffer data()
-	{
-		// Ensure nobody changes our original data buffer.
-		return this.data.asReadOnlyBuffer();
-	}
-
-	/**
-	 * @return This field's data as a raw byte array. Note that if this field is currently encrypted, this function will
-	 *         return encrypted data.
-	 */
-	public byte[] dataArray()
-	{
-		this.data.mark();
-		byte[] ret = new byte[this.data.remaining()];
-		this.data.get(ret);
-		this.data.reset();
-		return ret;
-	}
-
-	public String dataString() throws IllegalStateException
-	{
-		if (this.datatype != Datatype.String)
-			throw new IllegalStateException("Field is not a string.");
-		return U.toString(dataArray());
-	}
-
-	public Instant dataInstant() throws IllegalStateException
-	{
-		if (this.datatype != Datatype.Instant)
-			throw new IllegalStateException("Field is not an instant.");
-		return U.toInstant(data());
-	}
-
-	public boolean dataEquals(String data)
-	{
-		return dataEquals(U.toBytes(data));
-	}
-
-	public boolean dataEquals(byte[] data)
-	{
-		return this.dataEquals(ByteBuffer.wrap(data));
-	}
-
-	public boolean dataEquals(ByteBuffer data)
-	{
-		return this.data.compareTo(data) == 0;
-	}
-
-	/**
-	 * @param oth
-	 * @return true iff the other CommuniqueField contains the same data with the same encryption.
-	 */
-	public boolean equals(CommuniqueField oth)
-	{
-		if (oth == null)
-			return false;
-		if (oth.size != this.size)
-			return false;
-		if (oth.datatype != this.datatype)
-			return false;
-		if (oth.encoding != this.encoding)
-			return false;
-		if (oth.encryption != this.encryption)
-			return false;
-		return this.dataEquals(oth.data);
-	}
-
-	@Override
-	public boolean equals(Object o)
-	{
-		if (o instanceof CommuniqueField)
-			return this.equals((CommuniqueField) o);
-		return false;
+		res.putInt(ensureEncodedData().remaining());
 	}
 
 	/**
 	 * @return The data type stored in this field.
 	 */
-	public Datatype getDatatype()
+	public Datatype<?> getDatatype()
 	{
 		return this.datatype;
+	}
+
+	public <T> T data(Class<T> clazz) throws DecodingException
+	{
+		ensureData();
+		if (clazz.isAssignableFrom(this.datatype.getDataClass()))
+			return U.quietCast(this.data);
+		throw new ClassCastException("Cannot cast " + this.datatype.getDataClass().getCanonicalName() + " to " + clazz.getCanonicalName() + ".");
+	}
+
+	/**
+	 * @return the MetaSpace for the Communique attached to this field.
+	 */
+	public MetaSpace getMetaSpace()
+	{
+		return this.metaSpace;
+	}
+
+	/**
+	 * Sets this field's meta space, which is used for encoding and decoding.
+	 *
+	 * @param ms
+	 */
+	void setMetaSpace(MetaSpace ms)
+	{
+		this.metaSpace = ms;
+	}
+
+	/**
+	 * @return A read only ByteBuffer containing the data in this field.
+	 */
+	public ByteBuffer encodedData()
+	{
+		// Ensure nobody changes our original data buffer.
+		return ensureEncodedData().asReadOnlyBuffer();
 	}
 
 	/**
@@ -185,27 +126,18 @@ public class CommuniqueField
 		return this.encoding;
 	}
 
-	/**
-	 * @return
-	 */
-	public Encryption getEncryption()
-	{
-		return this.encryption;
-	}
-
 	public int getFieldIndex()
 	{
 		return this.fieldIndex;
 	}
 
-	public int getSize()
+	public int getEncodedSize() throws EncodingException
 	{
-		return this.size;
+		return ensureEncodedData().remaining();
 	}
 
 	void setData(ByteBuffer data)
 	{
-		this.data = data;
+		this.encodedData = data.asReadOnlyBuffer();
 	}
-
 }

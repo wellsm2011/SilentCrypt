@@ -1,7 +1,6 @@
 package silentcrypt.comm.server;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,7 +81,7 @@ public class Host implements Listenable<Host>
 
 	private Host(Supplier<ServerSocket> sockSrc, boolean isDaemon)
 	{
-		AtomicReference<BigInteger> connectionId = new AtomicReference<>(BigInteger.ONE);
+		AtomicReference<Long> connectionId = new AtomicReference<>(1L);
 		this.multiplexer = new ConnectionMultiplexer();
 		this.src = sockSrc;
 		init();
@@ -91,7 +90,7 @@ public class Host implements Listenable<Host>
 			for (;;)
 				try
 				{
-					BigInteger id = connectionId.getAndAccumulate(BigInteger.ONE, (f, s) -> f.add(s));
+					long id = connectionId.getAndAccumulate(1L, (f, s) -> f + s);
 					Socket t = this.sock.accept();
 					U.p("Recieved opening connection from " + t.getRemoteSocketAddress());
 					new Thread(() -> handle(t, id), "[Host] incoming connection handler : " + t.getRemoteSocketAddress()).start();
@@ -106,7 +105,7 @@ public class Host implements Listenable<Host>
 		listener.start();
 	}
 
-	private void handle(Socket t, BigInteger connectionId)
+	private void handle(Socket t, long connectionId)
 	{
 		try
 		{

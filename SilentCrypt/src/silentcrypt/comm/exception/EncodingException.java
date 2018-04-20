@@ -12,4 +12,9 @@ public class EncodingException extends RuntimeException
 		super(string);
 	}
 
+	public EncodingException(String string, Throwable cause)
+	{
+		super(string, cause);
+	}
+
 }

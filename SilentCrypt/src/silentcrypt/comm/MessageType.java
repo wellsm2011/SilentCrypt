@@ -138,7 +138,7 @@ public enum MessageType
 		if (c.getField(0).getEncryption() != Encryption.Unencrypted || c.getField(0).getEncryption() != Encryption.Unencrypted)
 			return null;
 
-		MessageType type = get(c.getField(0).data().getShort());
+		MessageType type = get(c.getField(0).encodedData().getShort());
 		if (type == null || c.fieldCount() < type.minimumFields)
 			return null;
 

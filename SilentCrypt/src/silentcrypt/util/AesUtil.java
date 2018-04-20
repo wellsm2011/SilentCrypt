@@ -1,5 +1,6 @@
 package silentcrypt.util;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.bouncycastle.crypto.DataLengthException;
@@ -34,9 +35,14 @@ public class AesUtil
 	 * @return A BinaryData blob containing the decrypted data.
 	 * @throws InvalidCipherTextException
 	 */
-	public static BinaryData decrypt(BinaryData key, BinaryData input) throws InvalidCipherTextException
+	public static byte[] decrypt(byte[] key, byte[] input) throws InvalidCipherTextException
 	{
-		return BinaryData.fromBytes(AesUtil.cipher.setKey(key.getBytes()).decrypt(input.getBytes()));
+		return AesUtil.cipher.setKey(key).decrypt(input);
+	}
+
+	public static ByteBuffer decrypt(ByteBuffer key, byte[] input) throws InvalidCipherTextException
+	{
+		return ByteBuffer.wrap(decrypt(U.toBytes(key), input));
 	}
 
 	/**
@@ -50,14 +56,20 @@ public class AesUtil
 	 * @return A BinaryData blob containing the encrypted data.
 	 * @throws InvalidCipherTextException
 	 */
-	public static BinaryData encrypt(BinaryData key, BinaryData input) throws InvalidCipherTextException
+	public static byte[] encrypt(byte[] key, byte[] input) throws InvalidCipherTextException
 	{
-		return BinaryData.fromBytes(AesUtil.cipher.setKey(key.getBytes()).encrypt(input.getBytes()));
+		return AesUtil.cipher.setKey(key).encrypt(input);
+	}
+
+	public static ByteBuffer encrypt(ByteBuffer key, byte[] input) throws InvalidCipherTextException
+	{
+		return ByteBuffer.wrap(encrypt(U.toBytes(key), input));
 	}
 
 	private final PaddedBufferedBlockCipher aesCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
 
-	private KeyParameter key = null;
+	private byte[]			outputBuffer	= new byte[2048];
+	private KeyParameter	key				= null;
 
 	private AesUtil()
 	{
@@ -77,19 +89,14 @@ public class AesUtil
 	{
 		this.aesCipher.init(encrypt, this.key);
 
-		byte[] output = new byte[this.aesCipher.getOutputSize(input.length)];
-		int bytesWrittenOut = this.aesCipher.processBytes(input, 0, input.length, output, 0);
-		bytesWrittenOut += this.aesCipher.doFinal(output, bytesWrittenOut);
+		int outputSize = this.aesCipher.getOutputSize(input.length);
+		if (outputSize > this.outputBuffer.length)
+			this.outputBuffer = new byte[outputSize * 2];
 
-		if (bytesWrittenOut != output.length)
-		{
-			byte[] realOutput = new byte[bytesWrittenOut];
-			for (int i = 0; i < realOutput.length; ++i)
-				realOutput[i] = output[i];
-			output = realOutput;
-		}
+		int bytesWrittenOut = this.aesCipher.processBytes(input, 0, input.length, this.outputBuffer, 0);
+		bytesWrittenOut += this.aesCipher.doFinal(this.outputBuffer, bytesWrittenOut);
 
-		return output;
+		return Arrays.copyOf(this.outputBuffer, bytesWrittenOut);
 	}
 
 	public AesUtil setKey(byte[] key)
@@ -105,16 +112,16 @@ public class AesUtil
 	public static void main(String... strings) throws InvalidCipherTextException
 	{
 		U.p("--- Starting AES Tests ---");
-		BinaryData secret = BinaryData.fromString("Top Secret Message!!!!!!!!!");
-		BinaryData key = BinaryData.fromString("Secret Key");
+		String secret = "Top Secret Message!";
+		String key = "Secret Key";
 
 		U.p("Secret: " + secret);
 		U.p("Secret Bytes: " + U.niceToString(secret.getBytes()));
 		U.p("Key: " + key);
-		BinaryData cipherText = encrypt(key, secret);
-		U.p("Cipher Bytes: " + U.niceToString(cipherText.getBytes()));
-		BinaryData plainText = decrypt(key, cipherText);
-		U.p("Plaintext: " + plainText.toString());
-		U.p("Plaintext Bytes: " + U.niceToString(plainText.getBytes()));
+		byte[] cipherText = encrypt(U.toBytes(key), U.toBytes(secret));
+		U.p("Cipher Bytes: " + U.niceToString(cipherText));
+		byte[] plainText = decrypt(U.toBytes(key), cipherText);
+		U.p("Plaintext: " + U.toString(plainText));
+		U.p("Plaintext Bytes: " + U.niceToString(plainText));
 	}
 }

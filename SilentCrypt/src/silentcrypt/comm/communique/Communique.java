@@ -5,14 +5,18 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.zip.CRC32;
@@ -22,14 +26,42 @@ import org.bouncycastle.crypto.params.RSAKeyParameters;
 
 import silentcrypt.comm.exception.DecodingException;
 import silentcrypt.comm.exception.EncodingException;
-import silentcrypt.util.AesUtil;
-import silentcrypt.util.BinaryData;
 import silentcrypt.util.RsaUtil;
 import silentcrypt.util.U;
 
 /**
+ * <p>
  * Represents an abstract message which can be sent to or received from other systems or processes via any InputStream
  * or OutputStream.
+ * </p>
+ * <p>
+ * Overall Structure
+ * <ul>
+ * <li>Header Data
+ * <ul>
+ * <li>Version Data</li>
+ * <li>Timestamp -> long + int => Instant</li>
+ * <li>Timestamp -> long + int => Instant</li>
+ * <li>Flags - integer</li>
+ * <li>Field Count - integer</li>
+ * </ul>
+ * </li>
+ * <li>Optional Signed CRC
+ * <ul>
+ * <li>Integer Size of Signature</li>
+ * <li>Signature Data</li>
+ * </ul>
+ * </li>
+ * <li>Field List
+ * <ul>
+ * <li>DataType ID - Short</li>
+ * <li>Encoding ID - Short</li>
+ * <li>Data Size - Integer</li>
+ * </ul>
+ * </li>
+ * <li>Field Data</li>
+ * </ul>
+ * </p>
  *
  * @author Andrew Binns
  * @author Michael Wells
@@ -41,7 +73,8 @@ public class Communique
 		/**
 		 * If set, little endian, if unset, assumed to be big endian.
 		 */
-		Endieness(0);
+		Endieness(0),
+		Signed(1);
 
 		private int offset;
 
@@ -95,9 +128,12 @@ public class Communique
 					c.readOnly = true;
 					try
 					{
-						int sigSize = c.parseHeaderData(ByteBuffer.wrap(data));
-						c.sig = new byte[sigSize];
-						input.read(c.sig);
+						c.parseHeaderData(ByteBuffer.wrap(data));
+						if (c.flag(Flag.Signed))
+						{
+							c.sig = new byte[input.readShort()];
+							input.read(c.sig);
+						}
 					} catch (DecodingException e)
 					{
 						U.e("Got malformed communique while parsing header: " + e.getMessage());
@@ -105,18 +141,18 @@ public class Communique
 					}
 
 					List<CommuniqueField> fields = new ArrayList<>(c.fieldCount);
+					Deque<Integer> fieldSizes = new ArrayDeque<>(c.fieldCount);
 					for (int i = 0; i < c.fieldCount; i++)
 					{
 						short type = input.readShort();
 						short encoding = input.readShort();
-						short encryption = input.readShort();
-						int size = input.readInt();
-						fields.add(new CommuniqueField(i, type, encoding, encryption, size));
+						fieldSizes.add(input.readInt());
+						fields.add(new CommuniqueField(c.metaSpace, i, type, encoding));
 					}
 
 					for (CommuniqueField f : fields)
 					{
-						data = new byte[f.getSize()];
+						data = new byte[fieldSizes.pollFirst()];
 						input.read(data);
 						f.setData(ByteBuffer.wrap(data));
 					}
@@ -132,6 +168,18 @@ public class Communique
 					return null;
 				}
 		};
+	}
+
+	public MetaSpace getMetaSpace()
+	{
+		return this.metaSpace;
+	}
+
+	public Communique setMetaSpace(MetaSpace ms)
+	{
+		this.metaSpace = ms;
+		this.fields.forEach(f -> f.setMetaSpace(ms));
+		return this;
 	}
 
 	/**
@@ -151,8 +199,6 @@ public class Communique
 		// Primitive datatype
 		res += Short.BYTES;
 		// Encoding method
-		res += Short.BYTES;
-		// Encryption method
 		res += Short.BYTES;
 		// Encoded data length
 		res += Integer.BYTES;
@@ -179,8 +225,6 @@ public class Communique
 		// flags
 		res += Integer.BYTES;
 		// field count
-		res += Integer.BYTES;
-		// signature length
 		res += Integer.BYTES;
 		return res;
 	}
@@ -209,10 +253,11 @@ public class Communique
 		return ret;
 	}
 
-	private byte[]		version			= Communique.getCurrentVersion();
-	private byte[]		sig				= new byte[0];
-	private int			flags;
-	private BigInteger	connectionId	= BigInteger.ZERO;
+	private byte[]				version			= Communique.getCurrentVersion();
+	private byte[]				sig				= new byte[0];
+	private int					flags;
+	private long				connectionId	= 0L;
+	private transient MetaSpace	metaSpace		= new MetaSpace();
 
 	private int fieldCount;
 
@@ -240,8 +285,12 @@ public class Communique
 	public Communique(ByteBuffer data) throws DecodingException
 	{
 		this.readOnly = true;
-		this.sig = new byte[parseHeaderData(data)];
-		data.get(this.sig);
+		parseHeaderData(data);
+		if (flag(Flag.Signed))
+		{
+			this.sig = new byte[data.getShort()];
+			data.get(this.sig);
+		}
 
 		ensureValidCapacityForFields(data);
 
@@ -254,13 +303,13 @@ public class Communique
 	 * @param id
 	 * @return
 	 */
-	public Communique setConnectionId(BigInteger id)
+	public Communique setConnectionId(long id)
 	{
 		if (!this.readOnly)
 			throw new IllegalStateException("Connection ID can't be set for sending messages.");
-		if (this.connectionId != BigInteger.ZERO)
+		if (this.connectionId != 0L)
 			throw new IllegalStateException("Connection ID already set.");
-		if (id.signum() != 1)
+		if (id < 1)
 			throw new IllegalStateException("Connection ID must be positive.");
 		this.connectionId = id;
 		return this;
@@ -269,7 +318,7 @@ public class Communique
 	/**
 	 * @return the connection ID representing the source of this Communique.
 	 */
-	public BigInteger getConnectionId()
+	public long getConnectionId()
 	{
 		return this.connectionId;
 	}
@@ -282,107 +331,126 @@ public class Communique
 	 */
 	public Communique add(CommuniqueField field)
 	{
-		this.add(field.getDatatype(), field.getEncoding(), field.getEncryption(), field.data());
-		return this;
-	}
-
-	/**
-	 * Adds a new field to this Communique representing the given binary blob.
-	 *
-	 * @param data
-	 * @return this object
-	 */
-	public Communique add(byte[] data)
-	{
-		this.add(Datatype.BinaryBlob, Encoding.getDefault(), Encryption.Unencrypted, ByteBuffer.wrap(data));
-		return this;
-	}
-
-	/**
-	 * Adds a new RSA-encrypted field to this Communique representing the given binary blob.
-	 *
-	 * @param data
-	 * @param key
-	 * @return this object
-	 * @throws InvalidCipherTextException
-	 */
-	public Communique add(byte[] data, RSAKeyParameters key) throws InvalidCipherTextException
-	{
-		this.add(Datatype.BinaryBlob, Encoding.getDefault(), Encryption.Rsa4096, RsaUtil.encrypt(BinaryData.fromBytes(data), key).getBuffer());
-		return this;
-	}
-
-	/**
-	 * Adds a new AES-encrypted field to this Communique representing the given binary blob.
-	 *
-	 * @param data
-	 * @param modifier
-	 *            Called to allow modification (such as encryption) of the newly constructed CommuniqueField.
-	 * @return this object
-	 * @throws InvalidCipherTextException
-	 */
-	public Communique add(byte[] data, BinaryData key) throws InvalidCipherTextException
-	{
-		this.add(Datatype.BinaryBlob, Encoding.getDefault(), Encryption.Aes256, AesUtil.encrypt(BinaryData.fromBytes(data), key).getBuffer());
-		return this;
-	}
-
-	/**
-	 * Adds a new field to this Communique representing the given binary blob.
-	 *
-	 * @param data
-	 * @param enc
-	 * @return this object
-	 */
-	public Communique add(byte[] data, Encoding enc)
-	{
-		this.add(Datatype.String, enc, Encryption.Unencrypted, ByteBuffer.wrap(data));
-		return this;
-	}
-
-	private Communique add(Datatype datType, Encoding enc, Encryption crypt, ByteBuffer data)
-	{
 		if (this.readOnly)
 			throw new EncodingException("Please do not modify an existing communique.");
 		this.sig = new byte[0];
 		this.fieldCount++;
-		this.fields.add(new CommuniqueField(this.fields.size(), datType.getId(), enc.getId(), crypt.getId(), data));
+		this.fields.add(new CommuniqueField(this.metaSpace, this.fields.size(), field.getDatatype().getId(), field.getDatatype().getId(), field.encodedData()));
+		return this;
+	}
+
+	public <T> Communique add(T data) throws IllegalArgumentException
+	{
+		this.add(Encoding.getDefault(), data);
+		return this;
+	}
+
+	public <T> Communique add(Encoding encoding, T data) throws IllegalArgumentException
+	{
+		this.add(Datatype.get(data), encoding, data);
+		return this;
+	}
+
+	public <T> Communique add(Datatype<T> datatype, Encoding encoding, T data)
+	{
+		Objects.requireNonNull(datatype, "Invalid data type provided.");
+		Objects.requireNonNull(encoding);
+
+		if (this.readOnly)
+			throw new EncodingException("Please do not modify an existing communique.");
+		this.sig = new byte[0];
+		this.fieldCount++;
+		this.fields.add(new CommuniqueField(this.metaSpace, this.fields.size(), datatype.getId(), encoding.getId(), datatype.encode(data)));
 		return this;
 	}
 
 	/**
-	 * Adds a new field to this Communique representing the given String.
+	 * Verifies that this Communique has the proper information in it's Metaspace to encode or decode the message.
 	 *
-	 * @param data
-	 * @return this object
+	 * @throws EncodingException
+	 * @throws DecodingException
 	 */
-	public Communique add(String data)
+	public Communique ensureFields() throws EncodingException, DecodingException
 	{
-		this.add(Datatype.String, Encoding.getDefault(), Encryption.Unencrypted, U.toBuff(data));
+		for (CommuniqueField f : this.fields)
+		{
+			f.ensureData();
+			f.ensureEncodedData();
+		}
 		return this;
 	}
 
 	/**
-	 * @param data
-	 * @param modifier
-	 * @return this object
+	 * Attempts to extract this Communique into the specified class. The given class must be instancable with a no-args
+	 * constructor.
+	 *
+	 * @param clazz
+	 * @return
 	 */
-	public Communique add(String data, Consumer<CommuniqueField> modifier)
+	public <T> T extractTo(Class<T> datatype)
 	{
-		this.add(data);
-		modifier.accept(this.fields.get(this.fields.size() - 1));
-		return this;
+		if (!canExtractTo(datatype))
+			return null;
+
+		try
+		{
+			Class<?> clazz = datatype;
+			T instance = datatype.getConstructor().newInstance();
+
+			for (; clazz != null; clazz = clazz.getSuperclass())
+			{
+				Field[] fields = clazz.getFields();
+				for (int i = 0; i < fields.length; ++i)
+				{
+				}
+			}
+
+			return instance;
+		} catch (IllegalArgumentException | ReflectiveOperationException | SecurityException e)
+		{
+			return null;
+		}
 	}
 
-	/**
-	 * @param data
-	 * @param enc
-	 * @return this object
-	 */
-	public Communique add(String data, Encoding enc)
+	public boolean canExtractTo(Class<?> clazz)
 	{
-		this.add(Datatype.String, enc, Encryption.Unencrypted, U.toBuff(data));
-		return this;
+		if (!hasSameFieldLength(clazz))
+			return false;
+
+		try
+		{
+			clazz.getConstructor();
+
+			for (; clazz != null; clazz = clazz.getSuperclass())
+			{
+				Field[] fields = clazz.getFields();
+				for (int i = 0; i < fields.length; ++i)
+				{
+					// We don't encode static or transient fields.
+					if (Modifier.isStatic(fields[i].getModifiers()) || Modifier.isTransient(fields[i].getModifiers()))
+						continue;
+
+					Datatype<?> fieldType = Datatype.get(fields[i].getType());
+					if (fieldType == null)
+						return false;
+					if (!this.fields.get(i).getDatatype().equals(fieldType))
+						return false;
+				}
+			}
+			return true;
+		} catch (NoSuchMethodException | SecurityException e)
+		{
+			return false;
+		}
+	}
+
+	private boolean hasSameFieldLength(Class<?> clazz)
+	{
+		long classFieldCount = 0;
+		for (; clazz != null; clazz = clazz.getSuperclass())
+			classFieldCount += Arrays.stream(clazz.getDeclaredFields()).filter(f -> !Modifier.isStatic(f.getModifiers()) && !Modifier.isTransient(f.getModifiers())).count();
+
+		return classFieldCount == this.fieldCount;
 	}
 
 	private byte[] checksum()
@@ -392,7 +460,7 @@ public class Communique
 		// A checksum for all fields plus a timestamp.
 		ByteBuffer checksum = ByteBuffer.allocate(Long.BYTES + Long.BYTES + Integer.BYTES);
 		for (CommuniqueField field : this.fields)
-			algorithm.update(field.data());
+			algorithm.update(field.encodedData());
 		checksum.putLong(algorithm.getValue());
 		checksum.putLong(this.signingTime.getEpochSecond());
 		checksum.putInt(this.signingTime.getNano());
@@ -404,12 +472,13 @@ public class Communique
 	 * @return this object
 	 * @throws InvalidCipherTextException
 	 */
-	public Communique sign(RSAKeyParameters key) throws InvalidCipherTextException
+	public Communique sign() throws InvalidCipherTextException, IllegalStateException
 	{
+		RSAKeyParameters key = this.metaSpace.get(MetaSpace.RSA_KEY);
 		if (this.readOnly)
 			throw new IllegalStateException("Cannot sign a read only message.");
 		this.signingTime = Instant.now();
-		this.sig = RsaUtil.encrypt(BinaryData.fromBytes(checksum()), key).getBytes();
+		this.sig = RsaUtil.encrypt(checksum(), key);
 		return this;
 	}
 
@@ -435,7 +504,7 @@ public class Communique
 		try
 		{
 			byte[] checksum = checksum();
-			byte[] sig = RsaUtil.decrypt(BinaryData.fromBytes(this.sig), key).getBytes();
+			byte[] sig = RsaUtil.decrypt(this.sig, key);
 
 			if (sig.length != checksum.length)
 				return false;
@@ -461,15 +530,32 @@ public class Communique
 		return compile().array();
 	}
 
+	private void setFlag(Flag f)
+	{
+		this.flags |= 1 << f.offset;
+	}
+
+	private void clearFlag(Flag f)
+	{
+		this.flags &= ~(1 << f.offset);
+	}
+
 	private ByteBuffer compile()
 	{
 		int msgSize = 0;
 		msgSize += Communique.getMinHeaderSize();
 		msgSize += this.sig.length;
 		msgSize += this.fieldCount * Communique.getMinFieldDefSize();
-		msgSize += this.fields.stream().mapToInt(CommuniqueField::getSize).sum();
+		msgSize += this.fields.stream().mapToInt(CommuniqueField::getEncodedSize).sum();
 		ByteBuffer res = ByteBuffer.allocate(msgSize);
-		res.order(flag(Flag.Endieness) ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+		// enable when DataInputStream actually supports endienness...
+		// if (false)
+		// if (res.order().equals(ByteOrder.BIG_ENDIAN))
+		// clearFlag(Flag.Endieness);
+		// else
+		// setFlag(Flag.Endieness);
+		res.order(ByteOrder.BIG_ENDIAN);
+		clearFlag(Flag.Endieness);
 
 		// header data
 		res.put(Communique.getCurrentVersion());
@@ -477,15 +563,18 @@ public class Communique
 		U.toBuff(Instant.now(), res);
 		res.putInt(this.flags);
 		res.putInt(this.fieldCount);
-		res.putInt(this.sig.length);
-		res.put(this.sig);
+		if (flag(Flag.Signed))
+		{
+			res.putInt(this.sig.length);
+			res.put(this.sig);
+		}
 
 		// field data
 		this.fields.forEach(f -> f.compile(res));
 
 		this.fields.forEach(f -> {
-			f.data().rewind();
-			res.put(f.data());
+			f.encodedData().rewind();
+			res.put(f.encodedData());
 		});
 
 		return res;
@@ -497,7 +586,7 @@ public class Communique
 	 */
 	public byte[] data(int index)
 	{
-		ByteBuffer b = this.fields.get(index).data();
+		ByteBuffer b = this.fields.get(index).encodedData();
 		byte[] res = new byte[b.capacity()];
 		b.rewind();
 		b.get(res);
@@ -536,14 +625,13 @@ public class Communique
 		{
 			short type = data.getShort();
 			short encoding = data.getShort();
-			short encryption = data.getShort();
 			int size = data.getInt();
 			data.mark();
 			data.position(dataStart);
 			ByteBuffer curData = ((ByteBuffer) data.duplicate().limit(size)).slice();
 			dataStart += size;
 			data.reset();
-			res.add(new CommuniqueField(i, type, encoding, encryption, size, curData));
+			res.add(new CommuniqueField(this.metaSpace, i, type, encoding, curData));
 		}
 		return res;
 	}
@@ -604,7 +692,7 @@ public class Communique
 	 * @return the number of bytes in the signature field
 	 * @throws DecodingException
 	 */
-	private int parseHeaderData(ByteBuffer data) throws DecodingException
+	private void parseHeaderData(ByteBuffer data) throws DecodingException
 	{
 		// Parse header data
 		if (data.remaining() < Communique.getMinHeaderSize())
@@ -620,12 +708,9 @@ public class Communique
 		if (flag(Flag.Endieness))
 			data.order(ByteOrder.LITTLE_ENDIAN);
 		this.fieldCount = data.getInt();
-		// Extract signature, if any.
-		int sigLength = data.getInt();
 
 		if (this.fieldCount < 0)
 			throw new DecodingException("Invalid field count");
-		return sigLength;
 	}
 
 	/**
@@ -651,8 +736,8 @@ public class Communique
 			sb.append(' ').append(f.toString() + ":").append(flag(f));
 		for (CommuniqueField f : this.fields)
 		{
-			sb.append(' ').append(f.getDatatype()).append(' ').append(f.getEncoding()).append('[').append(f.getSize()).append(']');
-			if (f.getDatatype().equals(Datatype.String))
+			sb.append(' ').append(f.getDatatype()).append(' ').append(f.getEncoding()).append('[').append(f.getEncodedSize()).append(']');
+			if (f.getDatatype().equals(Datatype.STRING))
 				sb.append(' ').append(U.toString(data(f.getFieldIndex())));
 		}
 

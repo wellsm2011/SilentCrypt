@@ -50,22 +50,25 @@ public abstract class CommBase
 
 		if (user == null)
 		{
-			reply.accept(rejectMessage(message));
+			reply.accept(rejectMessage(message, "User not authenticated."));
 			return null;
 		}
 
 		if (!message.validate(user.getPublicKey()))
 		{
-			reply.accept(rejectMessage(message));
+			reply.accept(rejectMessage(message, "Signature validation failed."));
 			return null;
 		}
+
+		return type;
 	}
 
 	protected Communique rejectMessage(Communique message, String reason)
 	{
 		Communique reply = MessageType.MESSAGE_REJECT.create(this.me.getUsername());
 		reply.add(reason);
-		reply.add(data)
+		reply.add(message.getTimestamp());
+		reply.add(message.getField(0));
 
 		return reply;
 	}
