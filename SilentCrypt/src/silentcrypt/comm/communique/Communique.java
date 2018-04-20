@@ -474,7 +474,7 @@ public class Communique
 	 */
 	public Communique sign() throws InvalidCipherTextException, IllegalStateException
 	{
-		RSAKeyParameters key = this.metaSpace.get(MetaSpace.RSA_KEY);
+		RSAKeyParameters key = this.metaSpace.get(MetaSpace.RSA_SELF).getPrivateRsa();
 		if (this.readOnly)
 			throw new IllegalStateException("Cannot sign a read only message.");
 		this.signingTime = Instant.now();

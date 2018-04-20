@@ -109,9 +109,9 @@ public class CertAuthComm
 	{
 		private static Communique MESSAGE_REJECT = new Communique().add(CertAuthComm.MESSAGE_REJECT);
 
-		RsaKeyPair				key;
-		Predicate<Communique>	isDistReq	= c -> c.fieldCount() > 0 && c.getFields().get(0).data(String.class).equals(U.toBytes(CertAuthComm.DIST_COMM_VERSION));
-		Predicate<Communique>	isCertReq	= c -> c.fieldCount() > 1 && c.getFields().get(0).data(String.class).equals(U.toBytes(CertAuthComm.CERT_COMM_VERSION));
+		MetaSpace				key			= new MetaSpace();
+		Predicate<Communique>	isDistReq	= c -> c.fieldCount() > 0 && Objects.equals(c.getField(0).quietData(String.class), CertAuthComm.DIST_COMM_VERSION);
+		Predicate<Communique>	isCertReq	= c -> c.fieldCount() > 1 && Objects.equals(c.getField(0).quietData(String.class), CertAuthComm.CERT_COMM_VERSION);
 		Predicate<Communique>	distFilter	= c -> true;
 		Predicate<Communique>	certFilter	= c -> true;
 		boolean					started		= false;
@@ -120,7 +120,7 @@ public class CertAuthComm
 
 		private CertAuthHost(RsaKeyPair key)
 		{
-			this.key = key;
+			this.key.set(MetaSpace.RSA_SELF, key);
 		}
 
 		/**
@@ -185,7 +185,7 @@ public class CertAuthComm
 		 */
 		public CertAuthHost start()
 		{
-			Communique publicReply = new Communique().add(MESSAGE_ACCEPT).add(RsaUtil.toBytes(this.key.getPublicRsa()));
+			Communique publicReply = new Communique().add(MESSAGE_ACCEPT).add(RsaUtil.toBytes(this.key.get(MetaSpace.RSA_SELF).getPublicRsa()));
 
 			this.started = true;
 			// Reply to distribution requests with the public reply iff they pass the distFilter.
@@ -207,9 +207,10 @@ public class CertAuthComm
 			// Construct our reply.
 			try
 			{
-				client.accept(new Communique().add(MESSAGE_ACCEPT).add(toEncrypt.array()).sign());
+				client.accept(new Communique().setMetaSpace(this.key).add(MESSAGE_ACCEPT).add(toEncrypt.array()).sign());
 			} catch (InvalidCipherTextException e)
 			{
+				U.e("Failed to fulfill certification request.", e);
 				client.accept(MESSAGE_REJECT);
 			}
 		}
@@ -266,7 +267,7 @@ public class CertAuthComm
 			Thread me = Thread.currentThread();
 			AtomicBoolean isWaiting = new AtomicBoolean(true);
 
-			Communique message = new Communique().add(CERT_COMM_VERSION).add(RsaUtil.toBytes(key));
+			Communique message = new Communique().add(CERT_COMM_VERSION).add(key);
 			AtomicReference<byte[]> ref = new AtomicReference<>();
 
 			send(message, (c, cons) -> {
@@ -452,7 +453,7 @@ public class CertAuthComm
 
 		Communique signTest = Communique.of("Top Secret Message!");
 		U.p("Signing a communique with my private key...");
-		signTest.getMetaSpace().set(MetaSpace.RSA_KEY, myKey.getPrivateRsa());
+		signTest.getMetaSpace().set(MetaSpace.RSA_SELF, myKey);
 		signTest.sign();
 		U.p("Verifying with my public key... (Should be valid)");
 		U.p(signTest.validate(myKey.getPublicRsa()) ? "Validated!" : "Invalid signature!");

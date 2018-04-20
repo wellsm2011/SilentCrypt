@@ -90,6 +90,17 @@ public class CommuniqueField
 		throw new ClassCastException("Cannot cast " + this.datatype.getDataClass().getCanonicalName() + " to " + clazz.getCanonicalName() + ".");
 	}
 
+	public <T> T quietData(Class<T> clazz)
+	{
+		try
+		{
+			return this.data(clazz);
+		} catch (ClassCastException | DecodingException ex)
+		{
+			return null;
+		}
+	}
+
 	/**
 	 * @return the MetaSpace for the Communique attached to this field.
 	 */

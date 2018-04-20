@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
+import silentcrypt.util.RsaKeyPair;
 import silentcrypt.util.U;
 
 public class MetaSpace
@@ -19,8 +20,9 @@ public class MetaSpace
 		}
 	}
 
-	public static final MetaKey<RSAKeyParameters>	RSA_KEY	= new MetaKey<>("rsa_key_data");
-	public static final MetaKey<byte[]>				AES_KEY	= new MetaKey<>("aes_key_data");
+	public static final MetaKey<RsaKeyPair>			RSA_SELF	= new MetaKey<>("rsa_key_self");
+	public static final MetaKey<RSAKeyParameters>	RSA_EXTERN	= new MetaKey<>("rsa_key_extern");
+	public static final MetaKey<byte[]>				AES_KEY		= new MetaKey<>("aes_key_data");
 	// as many as needed, shouldn't be too many
 
 	private Map<MetaKey<?>, Object> data;
