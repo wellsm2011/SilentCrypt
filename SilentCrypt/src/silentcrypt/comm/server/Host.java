@@ -77,7 +77,8 @@ public class Host implements Listenable<Host>
 	private Supplier<ServerSocket>	src;
 	private ServerSocket			sock;
 
-	private ConnectionMultiplexer multiplexer;
+	private ConnectionMultiplexer	multiplexer;
+	private Consumer<Long>			closeHandler	= U.emptyConsumer();
 
 	private Host(Supplier<ServerSocket> sockSrc, boolean isDaemon)
 	{
@@ -130,7 +131,14 @@ public class Host implements Listenable<Host>
 		{
 			U.e("No more data?....", e);
 		}
+		this.closeHandler.accept(connectionId);
 		U.p("Connection from " + t.getRemoteSocketAddress() + " closed.");
+	}
+
+	public Host setCloseHandler(Consumer<Long> handler)
+	{
+		this.closeHandler = handler;
+		return this;
 	}
 
 	private void init()

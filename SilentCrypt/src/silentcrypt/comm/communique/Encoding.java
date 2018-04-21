@@ -23,8 +23,8 @@ public enum Encoding
 	Uncompressed(0, b -> b, b -> b),
 	Deflate(1, b -> b, b -> b),
 	RsaEncrypt(2, (b, ms) -> RsaUtil.encrypt(b, ms.get(MetaSpace.RSA_EXTERN)), (b, ms) -> RsaUtil.decrypt(b, ms.get(MetaSpace.RSA_SELF).getPrivateRsa())),
-	RsaSign(2, (b, ms) -> RsaUtil.encrypt(b, ms.get(MetaSpace.RSA_SELF).getPrivateRsa()), (b, ms) -> RsaUtil.decrypt(b, ms.get(MetaSpace.RSA_EXTERN))),
-	Aes(3, (b, ms) -> AesUtil.encrypt(b, ms.get(MetaSpace.AES_KEY)), (b, ms) -> AesUtil.decrypt(b, ms.get(MetaSpace.AES_KEY)));
+	RsaSign(3, (b, ms) -> RsaUtil.encrypt(b, ms.get(MetaSpace.RSA_SELF).getPrivateRsa()), (b, ms) -> RsaUtil.decrypt(b, ms.get(MetaSpace.RSA_EXTERN))),
+	Aes(4, (b, ms) -> AesUtil.encrypt(b, ms.get(MetaSpace.AES_KEY)), (b, ms) -> AesUtil.decrypt(b, ms.get(MetaSpace.AES_KEY)));
 
 	private static BiFunction<ByteBuffer, MetaSpace, ByteBuffer> wrap(Func t)
 	{

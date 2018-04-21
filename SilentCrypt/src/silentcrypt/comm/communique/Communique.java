@@ -412,6 +412,12 @@ public class Communique
 		}
 	}
 
+	/**
+	 * Returns true if the fields of this Communique match the fields in the given class
+	 *
+	 * @param clazz
+	 * @return
+	 */
 	public boolean canExtractTo(Class<?> clazz)
 	{
 		if (!hasSameFieldLength(clazz))
@@ -431,9 +437,7 @@ public class Communique
 						continue;
 
 					Datatype<?> fieldType = Datatype.get(fields[i].getType());
-					if (fieldType == null)
-						return false;
-					if (!this.fields.get(i).getDatatype().equals(fieldType))
+					if (!Objects.equals(this.fields.get(i).getDatatype(), (fieldType)))
 						return false;
 				}
 			}

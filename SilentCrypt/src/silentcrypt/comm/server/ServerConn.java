@@ -2,9 +2,9 @@ package silentcrypt.comm.server;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -29,12 +29,13 @@ public class ServerConn implements Listenable<ServerConn>
 			// TODO have this do challenge-response with udp-broadcast
 			InetAddress addr = InetAddress.getByName("aeris-prime");
 			// TODO have port determined from challenge-response
-			return new ServerConn(addr, AerisStd.PORT);
+			return new ServerConn(new InetSocketAddress(addr, AerisStd.PORT));
 		} catch (UnknownHostException e)
 		{
 			U.e("Unable to locate primary AERIS instance.", e);
 			return null;
 		}
+
 	}
 
 	/**
@@ -44,22 +45,21 @@ public class ServerConn implements Listenable<ServerConn>
 	 * @param port
 	 * @return
 	 */
-	public static ServerConn get(InetAddress addr, int port)
+	public static ServerConn get(InetSocketAddress addr)
 	{
-		return new ServerConn(addr, port);
+		return new ServerConn(addr);
 	}
 
-	private InetAddress							serverAddr;
-	private Socket								sock;
-	private int									serverPort;
+	private InetSocketAddress					serverAddr;
+	private Socket								sock		= null;
 	private ConcurrentLinkedQueue<Communique>	sendQueue	= new ConcurrentLinkedQueue<>();
+	private boolean								openConn	= false;
 
 	private List<CommuniqueListener> handlers = new ArrayList<>();
 
-	protected ServerConn(InetAddress addr, int port)
+	protected ServerConn(InetSocketAddress addr)
 	{
 		this.serverAddr = addr;
-		this.serverPort = port;
 		openConn();
 		startWatchDog();
 		startSender();
@@ -92,7 +92,8 @@ public class ServerConn implements Listenable<ServerConn>
 	{
 		try
 		{
-			this.sock = new Socket(this.serverAddr, this.serverPort);
+			this.openConn = true;
+			this.sock = new Socket(this.serverAddr.getAddress(), this.serverAddr.getPort());
 			new ConnectionMultiplexer(this.sock.getInputStream(), this.sock.getOutputStream(), () -> this.handlers);
 			U.p("Server Connection Open");
 		} catch (IOException e)
@@ -130,8 +131,21 @@ public class ServerConn implements Listenable<ServerConn>
 	{
 		Thread sender = new Thread(() -> {
 			while (true)
+			{
 				if (this.sock != null)
+				{
+					if (!this.openConn)
+					{
+						try
+						{
+							this.sock.close();
+						} catch (IOException e)
+						{
+						}
+						this.sock = null;
+					}
 					while (!this.sendQueue.isEmpty())
+					{
 						try
 						{
 							Communique comm = this.sendQueue.peek();
@@ -143,9 +157,18 @@ public class ServerConn implements Listenable<ServerConn>
 							U.e("Unable to send communique to server.", e);
 							this.sock = null;
 						}
+					}
+				}
+			}
 		}, "Communique Sender #" + hashCode());
 		sender.setDaemon(true);
 		sender.start();
+	}
+
+	public ServerConn closeConn()
+	{
+		this.openConn = false;
+		return this;
 	}
 
 	private void startWatchDog()
@@ -157,17 +180,18 @@ public class ServerConn implements Listenable<ServerConn>
 				try
 				{
 					this.sock.getOutputStream().write(msg);
-					WritableByteChannel ch;
 					U.sleep(AerisStd.HEARTBEAT_PERIOD);
 				} catch (NullPointerException e)
 				{
 					U.sleep(AerisStd.RETRY_PERIOD);
-					openConn();
+					if (this.openConn)
+						openConn();
 				} catch (Throwable t)
 				{
 					U.e("Unable to connect to server, retrying...", t);
 					U.sleep(AerisStd.RETRY_PERIOD);
-					openConn();
+					if (this.openConn)
+						openConn();
 				}
 		}, "Server Connection Watchdog #" + hashCode());
 		watcher.setDaemon(true);

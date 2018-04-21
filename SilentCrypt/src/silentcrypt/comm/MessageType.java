@@ -7,7 +7,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import silentcrypt.comm.communique.Communique;
-import silentcrypt.comm.communique.Encryption;
+import silentcrypt.comm.communique.Datatype;
+import silentcrypt.comm.communique.Encoding;
 
 public enum MessageType
 {
@@ -135,7 +136,9 @@ public enum MessageType
 		if (c.fieldCount() < 2)
 			return null;
 
-		if (c.getField(0).getEncryption() != Encryption.Unencrypted || c.getField(0).getEncryption() != Encryption.Unencrypted)
+		if (c.getField(0).getEncoding() != Encoding.Uncompressed || c.getField(0).getDatatype() != Datatype.STRING)
+			return null;
+		if (c.getField(1).getEncoding() != Encoding.Uncompressed || c.getField(1).getDatatype() != Datatype.STRING)
 			return null;
 
 		MessageType type = get(c.getField(0).encodedData().getShort());

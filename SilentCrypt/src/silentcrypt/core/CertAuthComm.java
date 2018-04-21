@@ -1,6 +1,7 @@
 package silentcrypt.core;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
@@ -78,9 +79,9 @@ public class CertAuthComm
 	 * @param addr
 	 * @return
 	 */
-	public static CertAuthClient client(InetAddress addr, int port) throws TimeoutException
+	public static CertAuthClient client(InetSocketAddress addr) throws TimeoutException
 	{
-		return CertAuthComm.client(addr).setPort(port);
+		return new CertAuthClient(addr);
 	}
 
 	/**
@@ -218,13 +219,17 @@ public class CertAuthComm
 
 	public static class CertAuthClient
 	{
-		InetAddress				host;
-		int						port		= DEFAULT_PORT;
+		InetSocketAddress		host;
 		int						timeout		= 1 * 1000;
 		Consumer<Communique>	distAuth	= U.emptyConsumer();
 		Consumer<Communique>	certAuth	= U.emptyConsumer();
 
 		private CertAuthClient(InetAddress addr)
+		{
+			this.host = new InetSocketAddress(addr, DEFAULT_PORT);
+		}
+
+		private CertAuthClient(InetSocketAddress addr)
 		{
 			this.host = addr;
 		}
@@ -412,12 +417,6 @@ public class CertAuthComm
 			return this;
 		}
 
-		public CertAuthClient setPort(int port)
-		{
-			this.port = port;
-			return this;
-		}
-
 		public CertAuthClient setTimeout(int milliseconds)
 		{
 			this.timeout = milliseconds;
@@ -426,7 +425,7 @@ public class CertAuthComm
 
 		private void send(Communique message, BiConsumer<Communique, Consumer<Communique>> handler)
 		{
-			ServerConn.get(this.host, this.port).listen(c -> true, handler).send(message);
+			ServerConn.get(this.host).listen(c -> true, handler).send(message);
 		}
 	}
 

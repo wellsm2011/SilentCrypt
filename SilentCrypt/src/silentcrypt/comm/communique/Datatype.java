@@ -28,25 +28,32 @@ public class Datatype<T>
 	 */
 	public static final Datatype<byte[]> BINARY_BLOB = new Datatype<>(byte[].class, 0, ByteBuffer::wrap, U::toBytes);
 
+	public static final Datatype<Byte>		BYTE	= new Datatype<>(Byte.class, 1, l -> ByteBuffer.allocate(Byte.BYTES).put(l), bb -> bb.get());
+	public static final Datatype<Short>		SHORT	= new Datatype<>(Short.class, 2, l -> ByteBuffer.allocate(Short.BYTES).putShort(l), bb -> bb.getShort());
+	public static final Datatype<Integer>	INTEGER	= new Datatype<>(Integer.class, 3, l -> ByteBuffer.allocate(Integer.BYTES).putInt(l), bb -> bb.getInt());
+	public static final Datatype<Long>		LONG	= new Datatype<>(Long.class, 4, l -> ByteBuffer.allocate(Long.BYTES).putLong(l), bb -> bb.getLong());
+	public static final Datatype<Float>		FLOAT	= new Datatype<>(Float.class, 5, l -> ByteBuffer.allocate(Float.BYTES).putDouble(l), bb -> bb.getFloat());
+	public static final Datatype<Double>	DOUBLE	= new Datatype<>(Long.class, 6, l -> ByteBuffer.allocate(Long.BYTES).putDouble(l), bb -> bb.getDouble());
+
 	/**
 	 * Represents a String.
 	 */
-	public static final Datatype<String> STRING = new Datatype<>(String.class, 1, U::toBuff, U::toString);
+	public static final Datatype<String> STRING = new Datatype<>(String.class, 7, U::toBuff, U::toString);
 
 	/**
 	 * Represents a moment in time.
 	 */
-	public static final Datatype<Instant> INSTANT = new Datatype<>(Instant.class, 2, U::toBuff, U::toInstant);
+	public static final Datatype<Instant> INSTANT = new Datatype<>(Instant.class, 8, U::toBuff, U::toInstant);
 
 	/**
 	 * Represents a RSA key.
 	 */
-	public static final Datatype<RSAKeyParameters> RsaKey = new Datatype<>(RSAKeyParameters.class, 3, kp -> ByteBuffer.wrap(RsaUtil.toBytes(kp)), b -> RsaUtil.fromBytes(U.toBytes(b)));
+	public static final Datatype<RSAKeyParameters> RsaKey = new Datatype<>(RSAKeyParameters.class, 9, kp -> ByteBuffer.wrap(RsaUtil.toBytes(kp)), b -> RsaUtil.fromBytes(U.toBytes(b)));
 
 	/**
 	 * Represents an AES key.
 	 */
-	public static final Datatype<byte[]> AesKey = new Datatype<>(byte[].class, 4, ByteBuffer::wrap, U::toBytes);
+	public static final Datatype<byte[]> AesKey = new Datatype<>(byte[].class, 10, ByteBuffer::wrap, U::toBytes);
 
 	public static Datatype<?> get(short id)
 	{
