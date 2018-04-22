@@ -28,7 +28,7 @@ public class UserData
 		this.reply = reply;
 	}
 
-	public void setCert(byte[] cert, RSAKeyParameters caKey)
+	public void setCert(byte[] cert, RSAKeyParameters caKey) throws IllegalArgumentException
 	{
 		try
 		{

@@ -209,7 +209,7 @@ public class CertAuthComm
 			try
 			{
 				client.accept(new Communique().setMetaSpace(this.key).add(MESSAGE_ACCEPT).add(toEncrypt.array()).sign());
-			} catch (InvalidCipherTextException e)
+			} catch (IllegalStateException e)
 			{
 				U.e("Failed to fulfill certification request.", e);
 				client.accept(MESSAGE_REJECT);
