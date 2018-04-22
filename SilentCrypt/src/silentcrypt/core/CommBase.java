@@ -26,11 +26,13 @@ public abstract class CommBase
 	public static final int	HEARTBEAT_MILLIS	= 5 * 1000;
 
 	protected ArrayList<String>										activeChannels	= new ArrayList<>();
+	protected HashMap<String, byte[]>								channelKeys		= new HashMap<>();
 	protected ConcurrentHashMap<String, UserData>					connectedUsers	= new ConcurrentHashMap<>();
 	protected HashMap<MessageType, ArrayList<Consumer<Communique>>>	listeners		= new HashMap<>();
 	protected UserData												me;
 	protected RsaKeyPair											myKey;
 	protected RSAKeyParameters										caPublic		= null;
+	protected Consumer<Communique>									replyToServer	= null;
 
 	public CommBase(String username, RsaKeyPair myKey)
 	{
