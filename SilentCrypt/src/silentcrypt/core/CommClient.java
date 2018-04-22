@@ -1,5 +1,8 @@
 package silentcrypt.core;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
@@ -9,13 +12,81 @@ import silentcrypt.comm.communique.Datatype;
 import silentcrypt.comm.communique.Encoding;
 import silentcrypt.comm.communique.MetaSpace;
 import silentcrypt.comm.exception.MessageRejectedException;
+import silentcrypt.comm.server.ServerConn;
 import silentcrypt.util.RsaKeyPair;
+import silentcrypt.util.U;
 
 public class CommClient extends CommBase
 {
-	public CommClient(String username, RsaKeyPair myKey) throws TimeoutException, MessageRejectedException
+	private UserData server = null;
+
+	public CommClient(String username, RsaKeyPair myKey, InetAddress addr) throws TimeoutException, MessageRejectedException
 	{
 		super(username, myKey);
+		ServerConn srv = ServerConn.get(new InetSocketAddress(addr, CommBase.DEFAULT_PORT));
+		srv.listen(this::processMsg);
+		this.server = new UserData("SC-SRV", null, Instant.now(), 0, srv::send);
+
+		listen(this::processMessageReject, MessageType.MESSAGE_REJECT);
+		listen(this::processInformationResponse, MessageType.INFORMATION_RESPONSE);
+		listen(this::processChannelJoinAuthentication, MessageType.CHANNEL_JOIN_AUTHENTICATION);
+		listen(this::processAuthenticationResponse, MessageType.AUTHENTICATION_RESPONSE);
+		listen(this::processChannelLeaveNotice, MessageType.CHANNEL_LEAVE_NOTICE);
+		listen(this::processChannelCreationAnnouncement, MessageType.CHANNEL_CREATION_ANNOUNCEMENT);
+		listen(this::processChannelJoinAnnouncement, MessageType.CHANNEL_JOIN_ANNOUNCEMENT);
+		listen(this::processChannelLeaveAnnouncement, MessageType.CHANNEL_LEAVE_ANNOUNCEMENT);
+		listen(this::processServerJoinAnnouncement, MessageType.SERVER_JOIN_ANNOUNCEMENT);
+		listen(this::processServerLeaveAnnouncement, MessageType.SERVER_LEAVE_ANNOUNCEMENT);
+	}
+
+	private void processMessageReject(Communique msg)
+	{
+		U.e(MessageType.get(msg.getField(4).data(Integer.class)) + " rejected: " + msg.getField(2).data(String.class));
+	}
+
+	private void processInformationResponse(Communique msg)
+	{
+
+	}
+
+	private void processChannelJoinAuthentication(Communique msg)
+	{
+
+	}
+
+	private void processAuthenticationResponse(Communique msg)
+	{
+
+	}
+
+	private void processChannelLeaveNotice(Communique msg)
+	{
+
+	}
+
+	private void processChannelCreationAnnouncement(Communique msg)
+	{
+
+	}
+
+	private void processChannelJoinAnnouncement(Communique msg)
+	{
+
+	}
+
+	private void processChannelLeaveAnnouncement(Communique msg)
+	{
+
+	}
+
+	private void processServerJoinAnnouncement(Communique msg)
+	{
+
+	}
+
+	private void processServerLeaveAnnouncement(Communique msg)
+	{
+
 	}
 
 	public void sendChannelMessage(String channel, byte[] data)
@@ -27,7 +98,7 @@ public class CommClient extends CommBase
 		c.add(channel).add(Datatype.BINARY_BLOB, Encoding.Aes, data);
 		c.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey).set(MetaSpace.AES_KEY, channelKey);
 		c.sign();
-		this.replyToServer.accept(c);
+		this.server.replyTo(c);
 	}
 
 	public void sendUserMessage(String username, byte[] data)
@@ -39,7 +110,7 @@ public class CommClient extends CommBase
 		c.add(username).add(Datatype.BINARY_BLOB, Encoding.RsaEncrypt, data);
 		c.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey).set(MetaSpace.RSA_EXTERN, user.getPublicKey());
 		c.sign();
-		this.replyToServer.accept(c);
+		this.server.replyTo(c);
 	}
 
 	public CommClient listenToChannels(BiConsumer<String, byte[]> listener)

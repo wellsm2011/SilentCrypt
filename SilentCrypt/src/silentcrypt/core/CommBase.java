@@ -32,7 +32,6 @@ public abstract class CommBase
 	protected UserData												me;
 	protected RsaKeyPair											myKey;
 	protected RSAKeyParameters										caPublic		= null;
-	protected Consumer<Communique>									replyToServer	= null;
 
 	public CommBase(String username, RsaKeyPair myKey)
 	{
@@ -50,6 +49,19 @@ public abstract class CommBase
 			this.caPublic = c.query();
 		if (!this.me.hasCert())
 			this.me.setCert(c.certify(this.myKey.getPublicRsa()), this.caPublic);
+	}
+
+	protected void processMsg(Communique msg, Consumer<Communique> reply)
+	{
+		MessageType mt = validate(msg, reply);
+		if (mt != null)
+		{
+			ArrayList<Consumer<Communique>> listeners = this.listeners.get(mt);
+			for (Consumer<Communique> listener : listeners)
+				listener.accept(msg);
+			if (listeners.isEmpty())
+				rejectMessage(msg, "Not processed.");
+		}
 	}
 
 	protected void listen(Consumer<Communique> listener, MessageType... types)
