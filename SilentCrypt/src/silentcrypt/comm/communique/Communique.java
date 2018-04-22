@@ -84,7 +84,7 @@ public class Communique
 		}
 	}
 
-	public static final byte[] V_0_3 = U.toBytes("AERIS-COMM-0003");
+	public static final byte[] V_0_3 = U.toBytes("AERIS-COMM-0004");
 
 	/**
 	 * @param in
@@ -100,27 +100,30 @@ public class Communique
 			main: while (true)
 				try
 				{
-					/* Wait until we've gotten the version data */
+					// Wait until we've gotten the version data
 					for (byte b : ver)
 					{
 						int cur = input.read();
+						// Bad data; abort!
 						if (cur == -1)
 							return null;
+						// Potentially offset from a real message; keep looking.
 						if (cur != b)
 							continue main;
 					}
-					/* Wait until we've gotten the rest of the header */
+					// Wait until we've gotten the rest of the header.
 					while (input.available() < headLen - ver.length)
 						U.sleep(5);
-					/*
-					 * read the rest of the header, since we've already read the version
-					 */
+
+					// read the rest of the header, since we've already read the version
 					data = new byte[headLen];
-					if (input.read(data, ver.length, headLen - ver.length) != headLen - ver.length)
+					int expectedRemainder = headLen - ver.length;
+					if (input.read(data, ver.length, expectedRemainder) != expectedRemainder)
 						continue;
-					/* backfill the version data */
+					// backfill the version data that we already verified.
 					for (int i = 0; i < ver.length; i++)
 						data[i] = ver[i];
+
 					/*
 					 * Since we think we've gotten the beginnings of a communication, start parsing
 					 */
@@ -476,14 +479,20 @@ public class Communique
 	 * @return this object
 	 * @throws InvalidCipherTextException
 	 */
-	public Communique sign() throws InvalidCipherTextException, IllegalStateException
+	public Communique sign() throws IllegalStateException
 	{
-		RSAKeyParameters key = this.metaSpace.get(MetaSpace.RSA_SELF).getPrivateRsa();
-		if (this.readOnly)
-			throw new IllegalStateException("Cannot sign a read only message.");
-		this.signingTime = Instant.now();
-		this.sig = RsaUtil.encrypt(checksum(), key);
-		return this;
+		try
+		{
+			RSAKeyParameters key = this.metaSpace.get(MetaSpace.RSA_SELF).getPrivateRsa();
+			if (this.readOnly)
+				throw new IllegalStateException("Cannot sign a read only message.");
+			this.signingTime = Instant.now();
+			this.sig = RsaUtil.encrypt(checksum(), key);
+			return this;
+		} catch (InvalidCipherTextException e)
+		{
+			throw new IllegalStateException("Could not sign Communique.", e);
+		}
 	}
 
 	/**
