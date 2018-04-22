@@ -1,10 +1,10 @@
 package silentcrypt.core;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.time.Instant;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
+
+import org.bouncycastle.crypto.params.RSAKeyParameters;
 
 import silentcrypt.comm.MessageType;
 import silentcrypt.comm.communique.Communique;
@@ -18,14 +18,20 @@ import silentcrypt.util.U;
 
 public class CommClient extends CommBase
 {
-	private UserData server = null;
+	private ServerConn server;
 
-	public CommClient(String username, RsaKeyPair myKey, InetAddress addr) throws TimeoutException, MessageRejectedException
+	public CommClient(String username, RsaKeyPair myKey, InetSocketAddress addr, InetSocketAddress caAddr) throws TimeoutException, MessageRejectedException
 	{
 		super(username, myKey);
-		ServerConn srv = ServerConn.get(new InetSocketAddress(addr, CommBase.DEFAULT_PORT));
-		srv.listen(this::processMsg);
-		this.server = new UserData("SC-SRV", null, Instant.now(), 0, srv::send);
+		if (addr.getPort() == 0)
+			addr = new InetSocketAddress(addr.getAddress(), CommBase.DEFAULT_PORT);
+
+		registerWithCa(caAddr);
+
+		Communique authReq = MessageType.AUTHENTICATION_REQUEST.create(username);
+		authReq.add(myKey.getPublicRsa()).add(this.me.getCert());
+
+		this.server = ServerConn.get(addr).listen(this::processMsg).send(authReq);
 
 		listen(this::processMessageReject, MessageType.MESSAGE_REJECT);
 		listen(this::processInformationResponse, MessageType.INFORMATION_RESPONSE);
@@ -46,12 +52,24 @@ public class CommClient extends CommBase
 
 	private void processInformationResponse(Communique msg)
 	{
+		String channel = msg.getField(2).data(String.class);
+		if (channel.isEmpty())
+		{
+			// Listing clients on the server.
+			for (int i = 3; i < msg.fieldCount(); i += 2)
+			{
+				String username = msg.getField(i).data(String.class);
+				RSAKeyParameters key = msg.getField(i + 1).data(RSAKeyParameters.class);
+				UserData ud = this.connectedUsers.get(username);
 
+				if (ud == null)
+					ud = new UserData(username, key, msg.getTimestamp(), -1, this.server::send);
+			}
+		}
 	}
 
 	private void processChannelJoinAuthentication(Communique msg)
 	{
-
 	}
 
 	private void processAuthenticationResponse(Communique msg)
@@ -98,7 +116,7 @@ public class CommClient extends CommBase
 		c.add(channel).add(Datatype.BINARY_BLOB, Encoding.Aes, data);
 		c.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey).set(MetaSpace.AES_KEY, channelKey);
 		c.sign();
-		this.server.replyTo(c);
+		this.server.send(c);
 	}
 
 	public void sendUserMessage(String username, byte[] data)
@@ -110,7 +128,7 @@ public class CommClient extends CommBase
 		c.add(username).add(Datatype.BINARY_BLOB, Encoding.RsaEncrypt, data);
 		c.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey).set(MetaSpace.RSA_EXTERN, user.getPublicKey());
 		c.sign();
-		this.server.replyTo(c);
+		this.server.send(c);
 	}
 
 	public CommClient listenToChannels(BiConsumer<String, byte[]> listener)

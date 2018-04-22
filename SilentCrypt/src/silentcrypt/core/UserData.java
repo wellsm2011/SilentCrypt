@@ -43,6 +43,16 @@ public class UserData
 		}
 	}
 
+	boolean updateLastMessage(Instant instant)
+	{
+		if (this.lastMessage.isBefore(instant))
+		{
+			this.lastMessage = instant;
+			return true;
+		}
+		return false;
+	}
+
 	public boolean hasCert()
 	{
 		return this.certificate != null;
@@ -71,12 +81,6 @@ public class UserData
 	public long getConnectionId()
 	{
 		return this.connectionId;
-	}
-
-	UserData updateLastMessage(Instant instant)
-	{
-		this.lastMessage = instant;
-		return this;
 	}
 
 	UserData updateReply(Consumer<Communique> reply)

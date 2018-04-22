@@ -21,17 +21,50 @@ import silentcrypt.util.RsaKeyPair;
 
 public abstract class CommBase
 {
+	public static class Channel
+	{
+		private String				name;
+		private ArrayList<String>	users	= new ArrayList<>();
+		private byte[]				key		= null;
+
+		public Channel(String name)
+		{
+			this.name = name;
+		}
+
+		public void setKey(byte[] key)
+		{
+			this.key = key;
+		}
+
+		public byte[] getKey()
+		{
+			return this.key;
+		}
+
+		public List<String> getUsers()
+		{
+			return this.users;
+		}
+
+		public String getName()
+		{
+			return this.name;
+		}
+	}
+
 	public static final int	DEFAULT_PORT		= 7779;
 	public static final int	TIMEOUT_MILLIS		= 11 * 1000;
 	public static final int	HEARTBEAT_MILLIS	= 5 * 1000;
 
-	protected ArrayList<String>										activeChannels	= new ArrayList<>();
+	protected ArrayList<Channel>									activeChannels	= new ArrayList<>();
 	protected HashMap<String, byte[]>								channelKeys		= new HashMap<>();
 	protected ConcurrentHashMap<String, UserData>					connectedUsers	= new ConcurrentHashMap<>();
 	protected HashMap<MessageType, ArrayList<Consumer<Communique>>>	listeners		= new HashMap<>();
 	protected UserData												me;
 	protected RsaKeyPair											myKey;
 	protected RSAKeyParameters										caPublic		= null;
+	private Instant													lastMessage		= Instant.now();
 
 	public CommBase(String username, RsaKeyPair myKey)
 	{
@@ -57,10 +90,11 @@ public abstract class CommBase
 		if (mt != null)
 		{
 			ArrayList<Consumer<Communique>> listeners = this.listeners.get(mt);
-			for (Consumer<Communique> listener : listeners)
-				listener.accept(msg);
 			if (listeners.isEmpty())
-				rejectMessage(msg, "Not processed.");
+				rejectMessage(msg, "Message ignored.");
+			else
+				for (Consumer<Communique> listener : listeners)
+					listener.accept(msg);
 		}
 	}
 
@@ -84,13 +118,36 @@ public abstract class CommBase
 
 		if (user == null)
 		{
-			reply.accept(rejectMessage(message, "User not authenticated."));
-			return null;
+			if (type.equals(MessageType.SERVER_JOIN_ANNOUNCEMENT) || type.equals(MessageType.AUTHENTICATION_RESPONSE))
+			{
+				RSAKeyParameters publicRsaKey = message.getField(2).data(RSAKeyParameters.class);
+				byte[] cert = message.getField(3).data(byte[].class);
+				UserData ud = new UserData(username, publicRsaKey, message.getTimestamp(), message.getConnectionId(), reply);
+				try
+				{
+					ud.setCert(cert, this.caPublic);
+				} catch (IllegalArgumentException ex)
+				{
+					reply.accept(rejectMessage(message, "Invalid certification supplied."));
+					return null;
+				}
+				this.connectedUsers.put(username, ud);
+			} else
+			{
+				reply.accept(rejectMessage(message, "User not authenticated."));
+				return null;
+			}
 		}
 
 		if (!message.validate(user.getPublicKey()))
 		{
 			reply.accept(rejectMessage(message, "Signature validation failed."));
+			return null;
+		}
+
+		if (!user.updateLastMessage(message.getTimestamp()))
+		{
+			reply.accept(rejectMessage(message, "Invalid timestamp."));
 			return null;
 		}
 
