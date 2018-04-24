@@ -53,23 +53,44 @@ public class CommClient extends CommBase
 	private void processInformationResponse(Communique msg)
 	{
 		String channel = msg.getField(2).data(String.class);
-		if (channel.isEmpty())
+		if (!channel.isEmpty())
 		{
-			// Listing clients on the server.
+			Channel chan = this.activeChannels.get(channel);
+			if (chan == null)
+			{
+				chan = new Channel(channel);
+				this.activeChannels.put(channel, chan);
+			}
+			chan.clearUsers();
+
+			// Listing clients in the channel.
 			for (int i = 3; i < msg.fieldCount(); i += 2)
 			{
 				String username = msg.getField(i).data(String.class);
 				RSAKeyParameters key = msg.getField(i + 1).data(RSAKeyParameters.class);
-				UserData ud = this.connectedUsers.get(username);
 
+				UserData ud = this.connectedUsers.get(username);
 				if (ud == null)
+				{
 					ud = new UserData(username, key, msg.getTimestamp(), -1, this.server::send);
+					this.connectedUsers.put(username, ud);
+				}
+				chan.ensureContains(ud);
+			}
+		} else
+		{
+			for (int i = 3; i < msg.fieldCount(); i++)
+			{
+				String channelName = msg.getField(i).data(String.class);
+				if (!this.activeChannels.containsKey(channelName))
+					this.activeChannels.put(channelName, new Channel(channelName));
 			}
 		}
 	}
 
 	private void processChannelJoinAuthentication(Communique msg)
 	{
+		Communique acceptJoin = MessageType.CHANNEL_JOIN_ACCEPT.create(this.me.getUsername());
 	}
 
 	private void processAuthenticationResponse(Communique msg)

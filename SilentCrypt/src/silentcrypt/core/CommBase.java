@@ -3,10 +3,9 @@ package silentcrypt.core;
 import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
@@ -23,9 +22,9 @@ public abstract class CommBase
 {
 	public static class Channel
 	{
-		private String				name;
-		private ArrayList<String>	users	= new ArrayList<>();
-		private byte[]				key		= null;
+		private String						name;
+		private HashMap<String, UserData>	users	= new HashMap<>();
+		private byte[]						key		= null;
 
 		public Channel(String name)
 		{
@@ -42,9 +41,20 @@ public abstract class CommBase
 			return this.key;
 		}
 
-		public List<String> getUsers()
+		public Collection<UserData> getUsers()
 		{
-			return this.users;
+			return Collections.unmodifiableCollection(this.users.values());
+		}
+
+		protected void clearUsers()
+		{
+			this.users.clear();
+		}
+
+		protected void ensureContains(UserData data)
+		{
+			if (!this.users.containsValue(data))
+				this.users.put(data.getUsername(), data);
 		}
 
 		public String getName()
@@ -57,14 +67,13 @@ public abstract class CommBase
 	public static final int	TIMEOUT_MILLIS		= 11 * 1000;
 	public static final int	HEARTBEAT_MILLIS	= 5 * 1000;
 
-	protected ArrayList<Channel>									activeChannels	= new ArrayList<>();
+	protected HashMap<String, Channel>								activeChannels	= new HashMap<>();
 	protected HashMap<String, byte[]>								channelKeys		= new HashMap<>();
-	protected ConcurrentHashMap<String, UserData>					connectedUsers	= new ConcurrentHashMap<>();
+	protected HashMap<String, UserData>								connectedUsers	= new HashMap<>();
 	protected HashMap<MessageType, ArrayList<Consumer<Communique>>>	listeners		= new HashMap<>();
 	protected UserData												me;
 	protected RsaKeyPair											myKey;
 	protected RSAKeyParameters										caPublic		= null;
-	private Instant													lastMessage		= Instant.now();
 
 	public CommBase(String username, RsaKeyPair myKey)
 	{
@@ -165,8 +174,8 @@ public abstract class CommBase
 		return reply;
 	}
 
-	public List<String> getChannels()
+	public Collection<Channel> getChannels()
 	{
-		return Collections.unmodifiableList(this.activeChannels);
+		return Collections.unmodifiableCollection(this.activeChannels.values());
 	}
 }
