@@ -1,6 +1,7 @@
 package silentcrypt.core;
 
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
@@ -30,6 +31,7 @@ public class CommClient extends CommBase
 
 		Communique authReq = MessageType.AUTHENTICATION_REQUEST.create(username);
 		authReq.add(myKey.getPublicRsa()).add(this.me.getCert());
+		authReq.getMetaSpace().set(MetaSpace.RSA_SELF, myKey);
 
 		this.server = ServerConn.get(addr).listen(this::processMsg).send(authReq);
 
@@ -37,12 +39,15 @@ public class CommClient extends CommBase
 		listen(this::processInformationResponse, MessageType.INFORMATION_RESPONSE);
 		listen(this::processChannelJoinAuthentication, MessageType.CHANNEL_JOIN_AUTHENTICATION);
 		listen(this::processAuthenticationResponse, MessageType.AUTHENTICATION_RESPONSE);
-		listen(this::processChannelLeaveNotice, MessageType.CHANNEL_LEAVE_NOTICE);
 		listen(this::processChannelCreationAnnouncement, MessageType.CHANNEL_CREATION_ANNOUNCEMENT);
 		listen(this::processChannelJoinAnnouncement, MessageType.CHANNEL_JOIN_ANNOUNCEMENT);
 		listen(this::processChannelLeaveAnnouncement, MessageType.CHANNEL_LEAVE_ANNOUNCEMENT);
 		listen(this::processServerJoinAnnouncement, MessageType.SERVER_JOIN_ANNOUNCEMENT);
 		listen(this::processServerLeaveAnnouncement, MessageType.SERVER_LEAVE_ANNOUNCEMENT);
+
+		Communique infoReq = MessageType.INFORMATION_REQUEST.create(username);
+		infoReq.getMetaSpace().set(MetaSpace.RSA_SELF, myKey);
+		this.server.send(infoReq);
 	}
 
 	private void processMessageReject(Communique msg)
@@ -90,7 +95,32 @@ public class CommClient extends CommBase
 
 	private void processChannelJoinAuthentication(Communique msg)
 	{
+		String username = msg.getField(1).data(String.class);
+		String channelname = msg.getField(2).data(String.class);
+		UserData user = this.connectedUsers.get(username);
+		if (user == null)
+		{
+			rejectChannelJoinAuth(username, channelname);
+			return;
+		}
+
+		Channel channel = this.activeChannels.get(channelname);
+		if (channel == null || channel.getKey() == null)
+		{
+			rejectChannelJoinAuth(username, channelname);
+			return;
+		}
 		Communique acceptJoin = MessageType.CHANNEL_JOIN_ACCEPT.create(this.me.getUsername());
+		acceptJoin.add(channelname).add(username).add(Encoding.RsaEncrypt, channel.getKey());
+		acceptJoin.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey).set(MetaSpace.RSA_EXTERN, user.getPublicKey());
+		this.server.send(acceptJoin.sign());
+	}
+
+	private void rejectChannelJoinAuth(String channelName, String client)
+	{
+		Communique msg = MessageType.CHANNEL_JOIN_REJECT.create(this.me.getUsername());
+		msg.add(channelName).add(client).getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey);
+		this.server.send(msg.sign());
 	}
 
 	private void processAuthenticationResponse(Communique msg)
@@ -98,34 +128,51 @@ public class CommClient extends CommBase
 
 	}
 
-	private void processChannelLeaveNotice(Communique msg)
-	{
-
-	}
-
 	private void processChannelCreationAnnouncement(Communique msg)
 	{
-
+		Channel channel = new Channel(msg.getField(2).data(String.class));
+		UserData user = this.connectedUsers.get(msg.getField(3).data(String.class));
+		this.activeChannels.put(channel.getName(), channel);
+		if (user != null)
+			channel.ensureContains(user);
 	}
 
 	private void processChannelJoinAnnouncement(Communique msg)
 	{
-
+		String channel = msg.getField(2).data(String.class);
+		Channel c = this.activeChannels.get(channel);
+		if (c == null)
+		{
+			c = new Channel(channel);
+			this.activeChannels.put(channel, c);
+		}
+		UserData user = this.connectedUsers.get(msg.getField(1).data(String.class));
+		if (user != null)
+			c.users.put(user.getUsername(), user);
 	}
 
 	private void processChannelLeaveAnnouncement(Communique msg)
 	{
-
+		Channel channel = this.activeChannels.get(msg.getField(2).data(String.class));
+		if (channel != null)
+			channel.users.remove(this.connectedUsers.get(msg.getField(1).data(String.class)));
 	}
 
 	private void processServerJoinAnnouncement(Communique msg)
 	{
-
+		String username = msg.getField(1).data(String.class);
+		RSAKeyParameters publicKey = msg.getField(2).data(RSAKeyParameters.class);
+		byte[] cert = msg.getField(3).data(byte[].class);
+		UserData user = new UserData(username, publicKey, Instant.now(), -1, this.server::send);
+		user.setCert(cert, this.caPublic);
+		this.connectedUsers.put(username, user);
 	}
 
 	private void processServerLeaveAnnouncement(Communique msg)
 	{
-
+		String username = msg.getField(1).data(String.class);
+		this.connectedUsers.remove(username);
+		this.activeChannels.values().forEach(c -> c.users.remove(username));
 	}
 
 	public void sendChannelMessage(String channel, byte[] data)

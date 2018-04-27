@@ -23,7 +23,7 @@ public abstract class CommBase
 	public static class Channel
 	{
 		private String						name;
-		private HashMap<String, UserData>	users	= new HashMap<>();
+		protected HashMap<String, UserData>	users	= new HashMap<>();
 		private byte[]						key		= null;
 
 		public Channel(String name)
@@ -60,6 +60,11 @@ public abstract class CommBase
 		public String getName()
 		{
 			return this.name;
+		}
+
+		protected UserData remove(String user)
+		{
+			return this.users.remove(user);
 		}
 	}
 

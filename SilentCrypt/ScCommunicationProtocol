@@ -30,7 +30,7 @@ Information Request[C]
     Note: Returns list of channels if channel name is blank or missing.
 
 Information Response[S]
-    Field 2: Channel Name (or blank if listing channels)
+    Field 2: Channel Name (or blank string if listing channels)
     Field 3+: List of items (if listing clients, fields alternate between usernames and public RSA keys)
     Note: Returns list of channels if channel name is blank or missing.
 
@@ -54,14 +54,12 @@ Channel Join Reject[P]
     Field 2: Channel Name
     Field 3: Client username
 
-Channel Leave Notice[S]
-    Field 2: Channel Name
-
 
 
 Channel Creation Announcement[S]
     Field 2: Channel name
     Field 3: Creator's username
+    // TODO: Add public RSA key to message.
 
 Channel Join Announcement[S] / Channel Leave Announcement[S]
     Field 2: Channel name

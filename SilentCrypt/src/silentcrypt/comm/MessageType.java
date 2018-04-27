@@ -59,10 +59,6 @@ public enum MessageType
 	 */
 	CHANNEL_JOIN_REJECT(9, 4),
 	/**
-	 * Extra fields: channel name
-	 */
-	CHANNEL_LEAVE_NOTICE(10, 3),
-	/**
 	 * Extra fields: channel name, creator's username
 	 */
 	CHANNEL_CREATION_ANNOUNCEMENT(11, 4),
