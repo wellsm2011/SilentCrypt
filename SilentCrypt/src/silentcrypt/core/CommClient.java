@@ -1,7 +1,6 @@
 package silentcrypt.core;
 
 import java.net.InetSocketAddress;
-import java.time.Instant;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
@@ -14,6 +13,7 @@ import silentcrypt.comm.communique.Encoding;
 import silentcrypt.comm.communique.MetaSpace;
 import silentcrypt.comm.exception.MessageRejectedException;
 import silentcrypt.comm.server.ServerConn;
+import silentcrypt.util.AesUtil;
 import silentcrypt.util.RsaKeyPair;
 import silentcrypt.util.U;
 
@@ -38,6 +38,7 @@ public class CommClient extends CommBase
 		listen(this::processMessageReject, MessageType.MESSAGE_REJECT);
 		listen(this::processInformationResponse, MessageType.INFORMATION_RESPONSE);
 		listen(this::processChannelJoinAuthentication, MessageType.CHANNEL_JOIN_AUTHENTICATION);
+		listen(this::processChannelJoinAccept, MessageType.CHANNEL_JOIN_ACCEPT);
 		listen(this::processAuthenticationResponse, MessageType.AUTHENTICATION_RESPONSE);
 		listen(this::processChannelCreationAnnouncement, MessageType.CHANNEL_CREATION_ANNOUNCEMENT);
 		listen(this::processChannelJoinAnnouncement, MessageType.CHANNEL_JOIN_ANNOUNCEMENT);
@@ -123,9 +124,22 @@ public class CommClient extends CommBase
 		this.server.send(msg.sign());
 	}
 
+	private void processChannelJoinAccept(Communique msg)
+	{
+		msg.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey);
+		String chanName = msg.getField(2).data(String.class);
+		Channel chan = this.activeChannels.get(chanName);
+		if (chan == null)
+		{
+			chan = new Channel(chanName);
+			chan.users.put(this.me.getUsername(), this.me);
+		}
+		chan.setKey(msg.getField(4).data(byte[].class));
+	}
+
 	private void processAuthenticationResponse(Communique msg)
 	{
-
+		processServerJoinAnnouncement(msg);
 	}
 
 	private void processChannelCreationAnnouncement(Communique msg)
@@ -163,7 +177,7 @@ public class CommClient extends CommBase
 		String username = msg.getField(1).data(String.class);
 		RSAKeyParameters publicKey = msg.getField(2).data(RSAKeyParameters.class);
 		byte[] cert = msg.getField(3).data(byte[].class);
-		UserData user = new UserData(username, publicKey, Instant.now(), -1, this.server::send);
+		UserData user = new UserData(username, publicKey, msg.getTimestamp(), -1, this.server::send);
 		user.setCert(cert, this.caPublic);
 		this.connectedUsers.put(username, user);
 	}
@@ -177,14 +191,16 @@ public class CommClient extends CommBase
 
 	public void sendChannelMessage(String channel, byte[] data)
 	{
-		byte[] channelKey = this.channelKeys.get(channel);
-		if (channelKey == null)
+		Channel chan = this.activeChannels.get(channel);
+		if (chan == null)
 			throw new IllegalArgumentException("Unknown channel: " + channel);
+		byte[] channelKey = chan.getKey();
+		if (channelKey == null)
+			throw new IllegalArgumentException("Not in channel: " + channel);
 		Communique c = MessageType.CHANNEL_MESSAGE.create(this.me.getUsername());
 		c.add(channel).add(Datatype.BINARY_BLOB, Encoding.Aes, data);
 		c.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey).set(MetaSpace.AES_KEY, channelKey);
-		c.sign();
-		this.server.send(c);
+		this.server.send(c.sign());
 	}
 
 	public void sendUserMessage(String username, byte[] data)
@@ -195,8 +211,21 @@ public class CommClient extends CommBase
 		Communique c = MessageType.CLIENT_MESSAGE.create(this.me.getUsername());
 		c.add(username).add(Datatype.BINARY_BLOB, Encoding.RsaEncrypt, data);
 		c.getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey).set(MetaSpace.RSA_EXTERN, user.getPublicKey());
-		c.sign();
-		this.server.send(c);
+		this.server.send(c.sign());
+	}
+
+	public CommClient createChannel(String channelName)
+	{
+		if (this.activeChannels.containsKey(channelName))
+			throw new IllegalArgumentException("Channel already exists.");
+
+		Communique msg = MessageType.CHANNEL_CREATE_REQUEST.create(this.me.getUsername());
+		msg.add(channelName).getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey);
+		this.server.send(msg.sign());
+		Channel channel = new Channel(channelName);
+		channel.setKey(AesUtil.randomKey());
+		this.activeChannels.put(channelName, channel);
+		return this;
 	}
 
 	public CommClient listenToChannels(BiConsumer<String, byte[]> listener)

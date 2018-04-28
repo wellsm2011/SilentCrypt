@@ -2,6 +2,7 @@ package silentcrypt.util;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Random;
 
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.InvalidCipherTextException;
@@ -123,5 +124,12 @@ public class AesUtil
 		byte[] plainText = decrypt(U.toBytes(key), cipherText);
 		U.p("Plaintext: " + U.toString(plainText));
 		U.p("Plaintext Bytes: " + U.niceToString(plainText));
+	}
+
+	public static byte[] randomKey()
+	{
+		byte[] aesKey = new byte[AES_KEY_SIZE];
+		new Random().nextBytes(aesKey);
+		return aesKey;
 	}
 }

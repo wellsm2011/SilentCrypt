@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.Security;
-import java.util.Random;
 
 import org.bouncycastle.crypto.AsymmetricBlockCipher;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
@@ -92,8 +91,7 @@ public class RsaUtil
 		// End result will be [[key length][rsa-encrypted aes key][aes encrypted data]]
 
 		// Generate AES key at random.
-		byte[] aesKey = new byte[AesUtil.AES_KEY_SIZE];
-		new Random().nextBytes(aesKey);
+		byte[] aesKey = AesUtil.randomKey();
 
 		Security.addProvider(new BouncyCastleProvider());
 		RSAEngine engine = new RSAEngine();

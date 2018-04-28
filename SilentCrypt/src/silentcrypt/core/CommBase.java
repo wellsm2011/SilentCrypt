@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 
@@ -20,7 +22,7 @@ import silentcrypt.util.RsaKeyPair;
 
 public abstract class CommBase
 {
-	public static class Channel
+	public class Channel
 	{
 		private String						name;
 		protected HashMap<String, UserData>	users	= new HashMap<>();
@@ -62,9 +64,14 @@ public abstract class CommBase
 			return this.name;
 		}
 
-		protected UserData remove(String user)
+		public boolean join(long timeout)
 		{
-			return this.users.remove(user);
+			if (CommBase.this instanceof CommClient)
+			{
+				Communique c = MessageType.CHANNEL_JOIN_REQUEST.create(CommBase.this.me.getUsername());
+				return this.key != null;
+			}
+			throw new IllegalArgumentException("Method must be called from client.");
 		}
 	}
 
@@ -73,7 +80,6 @@ public abstract class CommBase
 	public static final int	HEARTBEAT_MILLIS	= 5 * 1000;
 
 	protected HashMap<String, Channel>								activeChannels	= new HashMap<>();
-	protected HashMap<String, byte[]>								channelKeys		= new HashMap<>();
 	protected HashMap<String, UserData>								connectedUsers	= new HashMap<>();
 	protected HashMap<MessageType, ArrayList<Consumer<Communique>>>	listeners		= new HashMap<>();
 	protected UserData												me;
@@ -177,6 +183,11 @@ public abstract class CommBase
 		reply.sign();
 
 		return reply;
+	}
+
+	public Collection<Channel> myChannels()
+	{
+		return this.activeChannels.values().stream().filter(c -> Objects.nonNull(c.key)).collect(Collectors.toList());
 	}
 
 	public Collection<Channel> getChannels()
