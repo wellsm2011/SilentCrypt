@@ -37,9 +37,6 @@ Information Response[S]
 Channel Join / Create Request[C]
     Field 2: Channel Name
 
-Channel Join Request[C]
-    Field 2: Channel Name
-
 Channel Join Authentication[S]
     Field 2: Channel Name
     Field 3: Public RSA key
