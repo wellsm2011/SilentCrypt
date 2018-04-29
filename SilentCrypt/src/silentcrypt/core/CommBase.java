@@ -113,7 +113,7 @@ public abstract class CommBase
 		{
 			List<BiConsumer<Communique, Consumer<Communique>>> listeners = this.listeners.get(mt);
 			if (listeners.isEmpty())
-				rejectMessage(msg, "Message ignored.");
+				generateRejectMessage(msg, "Message ignored.");
 			else
 				for (BiConsumer<Communique, Consumer<Communique>> listener : listeners)
 					listener.accept(msg, reply);
@@ -156,33 +156,33 @@ public abstract class CommBase
 					ud.setCert(cert, this.caPublic);
 				} catch (IllegalArgumentException ex)
 				{
-					reply.accept(rejectMessage(message, "Invalid certification supplied."));
+					reply.accept(generateRejectMessage(message, "Invalid certification supplied."));
 					return null;
 				}
 				this.connectedUsers.put(username, ud);
 			} else
 			{
-				reply.accept(rejectMessage(message, "User not authenticated."));
+				reply.accept(generateRejectMessage(message, "User not authenticated."));
 				return null;
 			}
 		}
 
 		if (!message.validate(user.getPublicKey()))
 		{
-			reply.accept(rejectMessage(message, "Signature validation failed."));
+			reply.accept(generateRejectMessage(message, "Signature validation failed."));
 			return null;
 		}
 
 		if (!user.updateLastMessage(message.getTimestamp()))
 		{
-			reply.accept(rejectMessage(message, "Invalid timestamp."));
+			reply.accept(generateRejectMessage(message, "Invalid timestamp."));
 			return null;
 		}
 
 		return type;
 	}
 
-	protected Communique rejectMessage(Communique message, String reason)
+	protected Communique generateRejectMessage(Communique message, String reason)
 	{
 		Communique reply = MessageType.MESSAGE_REJECT.create(this.me.getUsername());
 		reply.add(this.me.getUsername()).add(reason).add(message.getTimestamp()).add(message.getField(0));
