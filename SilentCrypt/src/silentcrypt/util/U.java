@@ -21,6 +21,7 @@ import java.util.Base64;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BinaryOperator;
@@ -131,6 +132,11 @@ public class U
 	public static byte[] fromBase64(String input)
 	{
 		return Base64.getDecoder().decode(input);
+	}
+
+	public static boolean keyEquals(RSAKeyParameters a, RSAKeyParameters b)
+	{
+		return Objects.equals(a.getExponent(), b.getExponent()) && Objects.equals(b.getModulus(), a.getModulus());
 	}
 
 	@SafeVarargs

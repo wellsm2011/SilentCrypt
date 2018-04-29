@@ -94,4 +94,14 @@ public class UserData
 		this.reply.accept(message);
 		return this;
 	}
+
+	void setConnectionId(long connectionId)
+	{
+		this.connectionId = connectionId;
+	}
+
+	void setReplyTo(Consumer<Communique> reply2)
+	{
+		this.reply = reply2;
+	}
 }

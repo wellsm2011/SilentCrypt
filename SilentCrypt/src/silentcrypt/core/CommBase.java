@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -79,12 +81,12 @@ public abstract class CommBase
 	public static final int	TIMEOUT_MILLIS		= 11 * 1000;
 	public static final int	HEARTBEAT_MILLIS	= 5 * 1000;
 
-	protected HashMap<String, Channel>								activeChannels	= new HashMap<>();
-	protected HashMap<String, UserData>								connectedUsers	= new HashMap<>();
-	protected HashMap<MessageType, ArrayList<Consumer<Communique>>>	listeners		= new HashMap<>();
-	protected UserData												me;
-	protected RsaKeyPair											myKey;
-	protected RSAKeyParameters										caPublic		= null;
+	protected HashMap<String, Channel>													activeChannels	= new HashMap<>();
+	protected HashMap<String, UserData>													connectedUsers	= new HashMap<>();
+	protected HashMap<MessageType, List<BiConsumer<Communique, Consumer<Communique>>>>	listeners		= new HashMap<>();
+	protected UserData																	me;
+	protected RsaKeyPair																myKey;
+	protected RSAKeyParameters															caPublic		= null;
 
 	public CommBase(String username, RsaKeyPair myKey)
 	{
@@ -109,16 +111,22 @@ public abstract class CommBase
 		MessageType mt = validate(msg, reply);
 		if (mt != null)
 		{
-			ArrayList<Consumer<Communique>> listeners = this.listeners.get(mt);
+			List<BiConsumer<Communique, Consumer<Communique>>> listeners = this.listeners.get(mt);
 			if (listeners.isEmpty())
 				rejectMessage(msg, "Message ignored.");
 			else
-				for (Consumer<Communique> listener : listeners)
-					listener.accept(msg);
+				for (BiConsumer<Communique, Consumer<Communique>> listener : listeners)
+					listener.accept(msg, reply);
 		}
 	}
 
 	protected void listen(Consumer<Communique> listener, MessageType... types)
+	{
+		for (MessageType t : types)
+			this.listeners.get(t).add((c, r) -> listener.accept(c));
+	}
+
+	protected void listen(BiConsumer<Communique, Consumer<Communique>> listener, MessageType... types)
 	{
 		for (MessageType t : types)
 			this.listeners.get(t).add(listener);
