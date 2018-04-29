@@ -229,4 +229,9 @@ public class CommServer extends CommBase
 		msg.sign();
 		target.replyTo(msg);
 	}
+
+	public boolean isAlive()
+	{
+		return true;
+	}
 }

@@ -215,6 +215,11 @@ public class CertAuthComm
 				client.accept(MESSAGE_REJECT);
 			}
 		}
+
+		public boolean isAlive()
+		{
+			return this.started;
+		}
 	}
 
 	public static class CertAuthClient
