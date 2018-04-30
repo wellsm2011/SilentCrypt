@@ -120,7 +120,7 @@ public abstract class CommBase
 		}
 	}
 
-	protected void listen(Consumer<Communique> listener, MessageType... types)
+	public void listen(Consumer<Communique> listener, MessageType... types)
 	{
 		for (MessageType t : types)
 			this.listeners.get(t).add((c, r) -> listener.accept(c));
