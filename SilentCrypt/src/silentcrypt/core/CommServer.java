@@ -35,6 +35,8 @@ public class CommServer extends CommBase
 		listen(this::processInformationRequest, MessageType.INFORMATION_REQUEST);
 		listen(this::processChannelJoinRequest, MessageType.CHANNEL_JOIN_REQUEST);
 		listen(this::processChannelCreateRequest, MessageType.CHANNEL_CREATE_REQUEST);
+		listen(this::processChannelJoinAccept, MessageType.CHANNEL_JOIN_ACCEPT);
+		listen(this::processChannelJoinReject, MessageType.CHANNEL_JOIN_REJECT);
 		listen(this::processChannelMessage, MessageType.CHANNEL_MESSAGE);
 		listen(this::processClientMessage, MessageType.CLIENT_MESSAGE);
 	}
@@ -167,6 +169,20 @@ public class CommServer extends CommBase
 		announcement.add(channelName).add(user.getUsername()).getMetaSpace().set(MetaSpace.RSA_SELF, this.myKey);
 		announcement.sign();
 		this.connectedUsers.values().forEach(ud -> ud.replyTo(announcement));
+	}
+
+	private void processChannelJoinAccept(Communique msg, Consumer<Communique> reply)
+	{
+		if (!isKnownUser(msg, reply))
+			return;
+
+	}
+
+	private void processChannelJoinReject(Communique msg, Consumer<Communique> reply)
+	{
+		if (!isKnownUser(msg, reply))
+			return;
+
 	}
 
 	private void processChannelMessage(Communique msg, Consumer<Communique> reply)
